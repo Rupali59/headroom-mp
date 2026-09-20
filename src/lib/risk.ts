@@ -14,11 +14,25 @@
  *
  * The hatching check runs first and short-circuits the colour function —
  * a node with 2+ unassessable factors never gets a green/amber/red verdict.
+ *
+ * DATA-QUALITY GATE (Lane H, DATA.md caveat 5): "Readings above 100% of
+ * installed capacity exist in the source ... Clamp or flag anything over
+ * 100% as a data-quality exception — never render it as a confident red
+ * node. The most extreme thing on screen must not be the least
+ * trustworthy." `riskLevel()` now takes the node's `DataQuality`
+ * (`src/data/loader.ts`'s `classifyLoadQuality()` / `SubstationLoad.quality`)
+ * as an optional second argument, defaulting to `"ok"` so every existing
+ * call site (e.g. `src/components/map/grid-map.tsx`'s `riskLevel(factors)`)
+ * keeps compiling and behaving exactly as before. A non-"ok" quality
+ * short-circuits BEFORE the hatch check and returns `"flagged"` — a state
+ * distinct from `"hatched"` on purpose: hatched means "not enough factor
+ * data to score"; flagged means "the underlying reading is itself suspect,
+ * scoring it would be confidently wrong, not just incomplete."
  */
 
-import type { RiskFactor } from "./types";
+import type { DataQuality, RiskFactor } from "./types";
 
-export type RiskLevel = "green" | "amber" | "red" | "hatched";
+export type RiskLevel = "green" | "amber" | "red" | "hatched" | "flagged";
 
 /** DESIGN.md scopes the arithmetic to exactly these five risk factors. */
 export const RISK_FACTOR_COUNT = 5;
@@ -34,7 +48,11 @@ export function countUnknown(factors: readonly RiskFactor[]): number {
   return factors.filter((f) => f.score === "unknown").length;
 }
 
-export function riskLevel(factors: readonly RiskFactor[]): RiskLevel {
+export function riskLevel(
+  factors: readonly RiskFactor[],
+  quality: DataQuality = "ok",
+): RiskLevel {
+  if (quality !== "ok") return "flagged";
   if (countUnknown(factors) >= UNKNOWN_HATCH_THRESHOLD) return "hatched";
   const weak = countWeak(factors);
   if (weak === 0) return "green";

@@ -25,6 +25,16 @@
  * -> hatched, "not assessed". That is not a placeholder trick — it is the
  * product's own correct behaviour for "we have positions but no ingested
  * data yet," per DESIGN.md's "nodes that refuse to answer" principle.
+ *
+ * LOAD PANEL (Lane G, task 5): mounts `load-panel.tsx` below the map when
+ * a node is selected. `Substation` (above) carries no MVA/utilisation
+ * fields at all — see `load-panel.tsx`'s header for the full gap — so the
+ * panel is wired through a SEPARATE optional `loadDetails` prop rather
+ * than being derived from `substations`. Nothing supplies it today
+ * (same situation as `substations` when this file was written), so the
+ * panel renders its own honest "not published" state until Lane F wires a
+ * real array through, or `Substation` is extended to carry this data
+ * directly — a decision left to Lane 0/F, not made silently here.
  */
 
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -35,6 +45,7 @@ import type { Substation, RiskFactorName } from "@/lib/types";
 import { MapNode } from "./node";
 import { RiskLegend } from "./legend";
 import { FindingsBand, findingRowId, type FindingNode } from "./findings-band";
+import { LoadPanel, type SubstationLoadDetail } from "./load-panel";
 import { ReplayChrome, type LoadCondition } from "@/components/replay-chrome";
 
 export interface GridMapProps {
@@ -46,6 +57,14 @@ export interface GridMapProps {
    * unassessed rather than guessed.
    */
   substations?: Substation[];
+  /**
+   * Load detail for the panel a selected node opens — see the file
+   * header's "LOAD PANEL" note. Keyed by the same `id`s as
+   * `NODE_GEOMETRY`/`substations`. Optional; a missing or unmatched id
+   * renders `LoadPanel`'s own "not published" state, never invented
+   * figures.
+   */
+  loadDetails?: SubstationLoadDetail[];
 }
 
 type MergedNode = {
@@ -57,15 +76,29 @@ type MergedNode = {
   level: RiskLevel;
   weakCount: number | null;
   weakFactors: RiskFactorName[];
+  /** Task 4's optional ring input — see `node.tsx`'s header. Null when no
+   * `loadDetails` entry matches this node, or the match has no verified
+   * night-utilisation figure. */
+  nightUtilisationPct: number | null;
 };
 
 function mergeNode(
   geo: (typeof NODE_GEOMETRY)[number],
-  substations: Substation[] | undefined
+  substations: Substation[] | undefined,
+  loadDetails: SubstationLoadDetail[] | undefined
 ): MergedNode {
   const match = substations?.find((s) => s.id === geo.id);
   const factors = match?.riskFactors ?? null;
   const level = factors ? riskLevel(factors) : "hatched";
+  const loadMatch = loadDetails?.find((d) => d.id === geo.id);
+  const util =
+    loadMatch?.nightPeakMva &&
+    loadMatch.nightPeakMva.conf !== "unknown" &&
+    loadMatch.installedMva &&
+    loadMatch.installedMva.conf !== "unknown" &&
+    loadMatch.installedMva.v > 0
+      ? (loadMatch.nightPeakMva.v / loadMatch.installedMva.v) * 100
+      : null;
   return {
     id: geo.id,
     name: geo.name,
@@ -77,10 +110,11 @@ function mergeNode(
     weakFactors: factors
       ? factors.filter((f) => f.score === "weak").map((f) => f.name)
       : [],
+    nightUtilisationPct: util,
   };
 }
 
-export function GridMap({ substations }: GridMapProps) {
+export function GridMap({ substations, loadDetails }: GridMapProps) {
   const [condition, setCondition] = useState<LoadCondition>("winter");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusIndex, setFocusIndex] = useState(0);
@@ -93,15 +127,42 @@ export function GridMap({ substations }: GridMapProps) {
 
   const nodes = useMemo<MergedNode[]>(
     () =>
-      NODE_GEOMETRY.map((g) => mergeNode(g, substations))
+      NODE_GEOMETRY.map((g) => mergeNode(g, substations, loadDetails))
         // Same z-order as the legacy app's draw(): smaller voltage classes
         // first, so 765 kV nodes sit on top. Reused as tab order too.
         .sort((a, b) => a.voltageKv - b.voltageKv),
-    [substations]
+    [substations, loadDetails]
   );
 
+  // Whenever a node is selected, `LoadPanel` gets a real detail object —
+  // never `null` while `selectedId` is set — so it renders its own honest
+  // "not published" state (name, voltage, gap sentence) rather than
+  // vanishing. That matters today specifically: nothing upstream supplies
+  // `loadDetails` yet (see the file header), so this fallback branch is
+  // the one every selection currently takes.
+  const selectedLoadDetail = useMemo<SubstationLoadDetail | null>(() => {
+    if (!selectedId) return null;
+    const match = loadDetails?.find((d) => d.id === selectedId);
+    if (match) return match;
+    const node = nodes.find((n) => n.id === selectedId);
+    if (!node) return null;
+    return {
+      id: node.id,
+      name: node.name,
+      voltageKv: node.voltageKv,
+      voltageClass: null,
+      installedMva: null,
+      nightPeakMva: null,
+      spareAtNightMva: null,
+      minMva: null,
+      observationCount: 0,
+      sourceUrl: null,
+      asOf: null,
+    };
+  }, [loadDetails, selectedId, nodes]);
+
   const counts = useMemo(() => {
-    const c = { green: 0, amber: 0, red: 0, hatched: 0 };
+    const c = { green: 0, amber: 0, red: 0, hatched: 0, flagged: 0 };
     for (const n of nodes) c[n.level]++;
     return c;
   }, [nodes]);
@@ -234,6 +295,7 @@ export function GridMap({ substations }: GridMapProps) {
                     tabIndex={i === focusIndex ? 0 : -1}
                     onSelect={handleSelect}
                     onKeyDown={handleKeyDown}
+                    nightUtilisationPct={n.nightUtilisationPct}
                   />
                 );
               })}
@@ -241,6 +303,10 @@ export function GridMap({ substations }: GridMapProps) {
           </svg>
         </div>
       </div>
+
+      {selectedId && (
+        <LoadPanel detail={selectedLoadDetail} onClose={() => setSelectedId(null)} />
+      )}
     </div>
   );
 }

@@ -30,6 +30,57 @@
  * `geometry.ts` actually uses.
  *
  * ============================================================================
+ * MONTH LABELS — fixed 2026-09-20, upstream of everything below.
+ * ============================================================================
+ *
+ * Found by Lane L, independently reproduced here: every row's `month` field
+ * used to carry MPPTCL's own index-page text verbatim, and that text is the
+ * PUBLICATION month, not the month the file's rows are ABOUT — a file
+ * MPPTCL's site labelled "January'2026" contains December 2025 data.
+ * Systematic, not sporadic: 40 of 40 labels that happened to already parse
+ * as "Month'YYYY" were wrong, every one by exactly -1 month, at 100%
+ * modal-row-date confidence.
+ *
+ * `ingest/mpptcl-loading.py` now derives `month` from the DATA instead:
+ * each row's `peak_date` (the day its SIMULTANEOUS MAXIMUM fell on, ~99%
+ * populated) gives a file's true month as the modal year-month across its
+ * own rows — see that file's `resolve_true_month()`. The original scraped
+ * label survives on every row as `published_label`, never discarded: the
+ * disagreement between the two is itself information a future reader
+ * should not have to rediscover. `LoadingDoc.published_label` below mirrors
+ * it into this file for the same reason, and `MonthlyObservation.
+ * publishedLabel` (`src/lib/types.ts`) carries it out to any future UI.
+ *
+ * This is why AGGREGATION CHOICE #3's `series` no longer loses ~9% of rows
+ * to unparseable filename-stem labels (see that section) — the label those
+ * rows used to carry is gone as the SOURCE of truth for `month`, replaced
+ * by a value derived from data every row already had.
+ *
+ * SEASONAL IMPACT, recomputed against the corrected dataset (this session):
+ *
+ *   |          | published (stale) | corrected  |
+ *   |----------|-------------------|------------|
+ *   | winter   | 50.8% (n=115)     | 51.4% (n=230) |
+ *   | monsoon  | 43.7% (n=1760)    | 44.2% (n=2274) |
+ *   | gap      | +16.2%            | +16.3%     |
+ *
+ * The headline (+16%, winter nights hotter) survives correction almost
+ * exactly. What changes is the caveat: DATA.md caveat 4 ("winter sample is
+ * thin, n=115") is now overstated — the winter sample roughly DOUBLES to
+ * n=230, because true-February files were previously mislabelled March and
+ * fell out of the winter bucket entirely. DATA.md's "Seasonality, computed
+ * not asserted" section and caveat 4 are stale and need updating by
+ * whoever owns DATA.md; not done here (DATA.md is not this lane's file).
+ *
+ * SILENT ZERO CLOSED (rule:discernment-checks §2): the ingest summary used
+ * to report `months_ok: 55` while only 54 distinct files had any rows, and
+ * the 55th was unidentifiable — "ok" is not the same fact as "ok and
+ * contributed data". `find_empty_ok_files()` names it now: index-page label
+ * "February'2022", `MaxLoading-Jan-2022.xlsx`, 61,561 bytes downloaded, 0
+ * rows parsed. Recorded as `empty_ok_files` in the ingest JSON going
+ * forward.
+ *
+ * ============================================================================
  * AGGREGATION CHOICE #1 — which VOLTAGE CLASS represents a substation.
  * DATA.md's voltage-class-mismatch task: "Lane A ported the legacy demo's
  * hardcoded classes verbatim into geometry.ts; the measured data disagrees
@@ -140,13 +191,23 @@
  *
  * `SubstationLoad.series` carries one `MonthlyObservation` (`src/lib/
  * types.ts`) per parseable month in the label's primary-class series,
- * ascending chronological order (`parseMonthLabel()` — about 9% of raw
- * month labels are unparseable filename stems, e.g. "R-Max-Loading-Nov-22-1",
- * and are DROPPED from `series` rather than guessed at a position; a
- * sparkline silently rendering a month out of order is a wrong chart with
- * no error, and "excluded" is a safer failure than "wrong"). Those dropped
- * rows still count toward `observationCount` and are still eligible for
- * `worstNight`/`minMva` — those aggregates don't need calendar order.
+ * ascending chronological order (`parseMonthLabel()`). A row whose `month`
+ * doesn't parse is DROPPED from `series` rather than guessed at a position
+ * — a sparkline silently rendering a month out of order is a wrong chart
+ * with no error, and "excluded" is a safer failure than "wrong". Those
+ * dropped rows still count toward `observationCount` and are still
+ * eligible for `worstNight`/`minMva` — those aggregates don't need
+ * calendar order.
+ *
+ * As of the 2026-09-20 month-resolution fix (below), this is now a
+ * near-empty safety net rather than a routine 9%-of-rows exclusion: every
+ * `month` is derived from each row's own `peak_date` (a clean, always-
+ * parseable "Month'YYYY"), not scraped filename-stem text, so 0 of 27,680
+ * rows in the current dataset fail to parse. The code path is kept — an
+ * empty-ok file with zero dated rows (see `find_empty_ok_files()` in
+ * `ingest/mpptcl-loading.py`) still falls back to its scraped, possibly
+ * unparseable label, and a future ingest run could hit the same case
+ * again.
  *
  * SCOPE: populating a full ~55-month series for all 432 substations would
  * add roughly 3+ MB of JSON to a static export (`output: "export"`) where
@@ -192,7 +253,18 @@ interface LoadingDoc {
   min_mva: number | null;
   avg_mva: number | null;
   spare_at_peak_mva: number | null;
+  /** Data-derived month (modal `peak_date`), NOT MPPTCL's index-page text
+   * — see file header "MONTH LABELS", fixed 2026-09-20. */
   month: string;
+  /** MPPTCL's original index-page label, preserved for traceability.
+   * Declared optional (`?`) because it reached Mongo only after the fix
+   * above shipped — an older `loading` collection populated before this
+   * change won't have it on every document, and this loader must not
+   * throw over metadata absence. Same reasoning as `peak_date` above for
+   * why this can be declared here even though `ingest/mongo-load.ts`'s own
+   * type doesn't mention it: the field reaches Mongo via that file's `...r`
+   * spread regardless. */
+  published_label?: string;
   source_url: string;
 }
 
@@ -715,6 +787,7 @@ export function aggregateSubstations(rows: readonly LoadingDoc[]): SubstationLoa
         .sort((a, b) => a.key - b.key)
         .map(({ row: r }): MonthlyObservation => ({
           month: r.month,
+          publishedLabel: r.published_label,
           peakMva: r.peak_mva,
           peakIsNight: isNightHour(r.peak_hour),
           peakHour: r.peak_hour,

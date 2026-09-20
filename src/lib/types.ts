@@ -98,12 +98,21 @@ export type DataQuality = "ok" | "over-capacity" | "implausible";
  * problem `src/data/loader.ts`'s header discusses.
  */
 export interface MonthlyObservation {
-  /** Raw month label as MPPTCL's sheet names it, e.g. "July'2026". Not
-   * every raw row's label parses to a calendar date (~9% are bare filename
-   * stems) — see `src/data/loader.ts` `parseMonthLabel()`. Only rows whose
-   * month parses appear in a `series`, so it is safe to assume ascending
-   * chronological order without re-parsing `month` again downstream. */
+  /** Data-derived month, e.g. "December'2025" — the modal `peak_date`
+   * across this file's own rows, NOT the text MPPTCL's index page happened
+   * to label the file with (see `src/data/loader.ts` file header "MONTH
+   * LABELS", fixed 2026-09-20: that label is the file's PUBLICATION month,
+   * found to be systematically one month after the data it contains). Only
+   * rows whose derived month parses appear in a `series` — see
+   * `parseMonthLabel()` — so it is safe to assume ascending chronological
+   * order without re-parsing `month` again downstream. */
   month: string;
+  /** MPPTCL's original index-page label for this row's source file, e.g.
+   * "January'2026" when `month` above is "December'2025" — kept rather
+   * than discarded because the disagreement is itself information (which
+   * files MPPTCL mislabelled, and by how much). Undefined only for data
+   * ingested before the 2026-09-20 fix. */
+  publishedLabel?: string;
   peakMva: number | null;
   peakIsNight: boolean;
   peakHour: number | null;

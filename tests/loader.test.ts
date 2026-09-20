@@ -38,6 +38,7 @@ function row(overrides: {
   peak_mva?: number | null;
   peak_hour?: number | null;
   min_mva?: number | null;
+  published_label?: string;
 }) {
   return {
     substation: overrides.substation,
@@ -54,6 +55,7 @@ function row(overrides: {
     avg_mva: null,
     spare_at_peak_mva: null,
     month: overrides.month,
+    published_label: overrides.published_label,
     source_url: "https://www.mptransco.in/example.xlsx",
   };
 }
@@ -215,6 +217,18 @@ describe("aggregateSubstations — series is chronological and drops unparseable
     const [node] = aggregateSubstations(rows);
     expect(node.series.map((s) => s.month)).toEqual(["January'2024", "February'2024", "March'2024"]);
     expect(node.observationCount).toBe(4);
+  });
+
+  it("carries the scraped index-page label separately from the resolved month (2026-09-20 month fix)", () => {
+    const rows = [
+      row({
+        substation: "220KV SENDHWA", voltage_class: "220KV", month: "December'2025",
+        published_label: "January'2026", installed_mva: 160, peak_mva: 76, peak_hour: 11,
+      }),
+    ];
+    const [node] = aggregateSubstations(rows);
+    expect(node.series[0].month).toBe("December'2025");
+    expect(node.series[0].publishedLabel).toBe("January'2026");
   });
 
   it("a label GEOMETRY_LABEL_ALIAS does not resolve gets an empty series", () => {

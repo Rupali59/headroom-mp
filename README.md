@@ -42,24 +42,48 @@ This matters more than the features, so it is here rather than in a footnote.
 
 | | |
 |---|---|
-| **Verified** | Transformation capacity for 4 of 19 substations, from cited documents. Connectivity rules from the CERC GNA Regulations 2022. Peak demand from CEA. Planned augmentations and BESS tenders with their dates |
-| **Derived** | Transformation capacity for substations with no published figure, estimated from voltage class |
-| **Modelled** | All night headroom. **No per-substation coincident load is published anywhere in India**, so night headroom is computed from transformation capacity and state-level load. The method is shown on screen, including its weakness |
-| **Not known** | Substations where neither a published nor a derivable capacity exists. These render hatched and receive **no verdict at all** |
+| **Verified** | Installed capacity and peak loading, per substation, per transformer class, **with the date and hour the peak was recorded** — for 432 substations across 55 months. Populated on 100% of 27,680 rows. Plus connectivity rules from the CERC GNA Regulations 2022 and peak demand from CEA |
+| **Researched** | Values found by web search, each carrying its URL and retrieval date |
+| **Field** | An operator's own correction, stamped with who and when |
+| **Not known** | Anything absent after both. Renders hatched, receives **no verdict at all**, and names who holds the missing figure |
+| **Flagged** | A reading the source itself contradicts — `132KV SALAMATPUR` reports **183% of installed capacity**. Never given a confident verdict; marked `!` and set apart |
 
-**Nothing here is invented.** A modelled value with a stated method is not a guess, and
-the difference is the point of the project. Where the tool cannot answer, it says so and
-names which organisation holds the missing number.
+**Nothing here is invented, and almost nothing is modelled.** An earlier version of this
+file said night headroom had to be modelled because *"no per-substation coincident load
+is published anywhere in India."* **That was wrong.** MPPTCL publishes it monthly. The
+modelling was deleted; the measurement replaced it.
+
+## What we got wrong, and what it changed
+
+This project began from research asserting that MPPTCL's data was *"robots.txt blocked
+and not programmatically retrievable"* and that no per-substation coincident load is
+published in India. **Both are false**, measured 2026-09-20:
+
+- `mptransco.in/robots.txt` returns **404**. There is no robots.txt.
+- The site serves 136 KB to a plain `curl`.
+- **60 monthly spreadsheets** are published at `/TransmissionSystem/EHVSsloading`.
+- Every row carries installed capacity, peak MVA, **and the date and hour it fell on**.
+
+The likely cause of the original error: MPPTCL's server negotiates TLS the old way, so a
+naive Python fetch fails with an SSL error that looks like a wall. **The data was never
+blocked; the client was.**
+
+A second systematic error, found by cross-checking two signals: **every month label was
+off by exactly one month** — 40 of 40 parseable labels, 100% confidence. MPPTCL's index
+page labels each file by its *publication* month. A file labelled `January'2026` contains
+December 2025. Fixed at source; the original label is kept as `published_label`.
 
 ## What would make this a real tool
 
-Three datasets, and each one unblocks a specific factor:
+The ask is now smaller, which makes it more likely to be granted:
 
-1. **MPPTCL / STU** — per-substation available margin as CSV or an API, dated. Today it
-   is an undated PDF behind a bot-wall.
-2. **MP SLDC** — substation-level load profiles at 220 kV and above, even lagged a
-   quarter. This replaces every modelled night figure with a measured one.
-3. **MPPMCL** — BESS and round-the-clock procurement milestones by node.
+1. **A stable, dated URL** for the monthly loading data. Filenames are
+   `SimJune26nn.xlsx`, `MAX-LOADI-JULY-21092022.xlsx` — no convention, so every month is
+   a manual hunt.
+2. **The 5 pre-2022 months as `.xlsx`**, not legacy `.xls` which cannot be read.
+3. **Drawal headroom, not just transformer loading** — spare MVA is not what a new
+   consumer can draw; n-1, bay availability and the downstream network still bind.
+4. **One real MPSEDC enquiry**, run end to end. A person, not a dataset.
 
 ## Running it
 
@@ -95,11 +119,19 @@ one per environment.
 
 ### Testing the extraction path
 
-`extraction-test/` probes the three API behaviours the ingest depends on, before any of
-it is wired up: that PDF citations return page numbers, that citations and structured
-outputs are mutually exclusive, and — the one that matters — whether Claude correctly
-resolves **merged table cells**, where a row's substation column is blank and inherits
-from the cell above. A naive parser gets those rows wrong.
+`extraction-test/` probes the API behaviours the ingest depends on before any of it is
+wired up. Two of the three results were not what we expected, which is the point of
+probing rather than assuming:
+
+- **Page citations do NOT work through a strict tool.** Ran twice, zero citations both
+  times. The reason is structural: citations attach to `text` blocks, and a response
+  returning its payload through a `tool_use` block has none. The page numbers we do have
+  come from the model self-reporting them in the schema — a checkable claim, not a
+  platform guarantee.
+- **Merged table cells resolve correctly**, and better than the brief assumed. Rows whose
+  substation column is blank inherit from a merged cell above; the model attributed them
+  to `Pachora PS (Sec-I)` where we had guessed `Neemuch PS`. Checked against the page by
+  eye: **the model was right and the assumption was wrong.**
 
 ```bash
 cd extraction-test

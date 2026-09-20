@@ -67,7 +67,12 @@ import type { SubstationLoadDetail } from "@/components/map/load-panel";
 // this small, already-reduced JSON into the build exactly once — no
 // runtime fetch, no Mongo dependency, no Node-only API reachable from the
 // client bundle.
-import derived from "../../data-local/substations.json";
+// The precompute writes `substations.json`; a fresh clone has only the
+// committed `substations.placeholder.json` (empty arrays). Next resolves
+// whichever exists, so the build never fails on a missing file — it renders
+// every node hatched, which is the correct UNASSESSED state rather than a
+// crash or, worse, invented numbers. README explains how to populate it.
+import derived from "./derived-dataset";
 
 interface DerivedDataset {
   substations: Substation[];

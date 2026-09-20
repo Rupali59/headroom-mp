@@ -64,12 +64,20 @@ Three datasets, and each one unblocks a specific factor:
 ## Running it
 
 ```bash
-# Source documents are not committed — see below. Fetch them first:
-bash scripts/fetch-sources.sh
-
 npm install
-cp .env.example .env.local     # then fill it in
-npm run dev                    # http://localhost:3205
+npm run dev                    # http://localhost:3205 — builds immediately
+```
+
+**A fresh clone builds and runs straight away, showing every substation as "not
+assessed".** That is correct, not broken: the repo carries code, never data. To
+populate it with the real measured figures:
+
+```bash
+cp .env.example .env.local        # then fill it in
+bash scripts/fetch-sources.sh     # the published source documents, not committed
+python3 ingest/mpptcl-loading.py  # 55 months, 432 substations, ~27,680 rows
+npm run ingest                    # aggregate into MongoDB and the local dataset
+npm run dev
 ```
 
 ### Environment

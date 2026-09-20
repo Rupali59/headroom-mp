@@ -21,6 +21,9 @@ next-env.d.ts
 # working artifact, 12 MB of MPPTCL operational rows. It stays out of git so the
 # public repo carries code only and history stays clean by construction.
 data-local/
+# ...except the committed placeholder, so a fresh clone can build. The real
+# file is produced locally by the precompute and stays ignored.
+!data-local/substations.placeholder.json
 
 # Source documents are NOT redistributed from this repo.
 # They carry a RESTRICTED data-classification marking, they are published

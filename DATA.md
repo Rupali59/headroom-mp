@@ -81,11 +81,22 @@ The demo's own substations, EHV rows, worst night observation:
 node the plan already wanted flagged for BESS. Indore with 683 MVA spare sitting beside
 it is the whole product.
 
-**Seasonality, computed not asserted:** winter nights run mean utilisation 50.8%,
-monsoon nights 43.7% — **winter nights are +16% hotter.** `DESIGN.md` inferred this from
-two state-level monthly aggregates; it is now measured over 1,875 night-peak
-observations at substation level. Caveat: n=115 winter against n=1,760 monsoon, because
-most published months are non-winter. **Do not put +16% on a slide without saying n.**
+**Seasonality, computed not asserted — figures CORRECTED 2026-09-20 after the
+month-label fix:** winter nights run mean utilisation **51.4%**, monsoon nights
+**44.2%** — **winter nights are +16.3% hotter.** `DESIGN.md` inferred this from two
+state-level monthly aggregates; it is now measured at substation level.
+
+| | before the fix | corrected |
+|---|---|---|
+| winter mean night utilisation | 50.8% | **51.4%** |
+| monsoon | 43.7% | **44.2%** |
+| gap | 16.2% | **16.3%** |
+| winter sample | n=115 | **n=230** |
+
+The winter sample roughly DOUBLED because every month label was off by one, so
+true-February files were labelled March and fell out of the winter bucket entirely.
+**The headline survived the correction** — the claim was right and the evidence for it
+is better than we knew. Quote the corrected figures and the corrected n.
 
 ## The confidence ladder, revised
 

@@ -89,7 +89,19 @@ function mergeNode(
 ): MergedNode {
   const match = substations?.find((s) => s.id === geo.id);
   const factors = match?.riskFactors ?? null;
-  const level = factors ? riskLevel(factors) : "hatched";
+  // `quality` is riskLevel's second argument and it MUST be passed. Lane H
+  // added the `flagged` state so a node whose underlying READING is suspect
+  // never receives a confident verdict — `132KV SALAMATPUR` reports 183% of
+  // installed capacity (73.25 of 40 MVA) in MPPTCL's own sheet. Calling this
+  // 1-arg silently defaulted quality to "ok", so `flagged` could never fire and
+  // the least trustworthy node on the map would have rendered as an ordinary
+  // red one.
+  //
+  // No node in the currently wired set is flagged (all 17 read "ok"), which is
+  // precisely why this had no symptom: the defect is invisible until the first
+  // suspect reading is wired in, and by then it looks like a data problem
+  // rather than a call-site one.
+  const level = factors ? riskLevel(factors, match?.quality ?? "ok") : "hatched";
   const loadMatch = loadDetails?.find((d) => d.id === geo.id);
   const util =
     loadMatch?.nightPeakMva &&

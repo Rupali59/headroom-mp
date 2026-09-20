@@ -41,7 +41,46 @@ import { BlockedSources } from "@/components/blocked-sources";
 import { GridMap } from "@/components/map/grid-map";
 import { Worklist } from "@/components/worklist/worklist";
 import { FactorCard } from "@/components/factor-card";
+import { AnalysisPanel } from "@/components/analysis/scenario";
+import { TimelineSimulator } from "@/components/timeline/timeline";
+import type { AnalysisSubstation } from "@/lib/analysis";
 import { SUBSTATIONS, LOAD_DETAILS } from "./data";
+
+/**
+ * Three lanes independently built three types for the same data, because
+ * `Substation` cannot carry load fields: `SubstationLoad` (loader),
+ * `SubstationLoadDetail` (load panel) and `AnalysisSubstation` (analysis).
+ * That convergence is the signal the contract should be ONE type. Until it is,
+ * this adapter is the single place the shapes meet, so the seam is visible
+ * rather than scattered. A node without an installed-capacity figure is
+ * dropped rather than defaulted — analysis over an invented capacity is worse
+ * than analysis over fewer nodes.
+ */
+const LOAD_BY_ID = new Map(LOAD_DETAILS.map((d) => [d.id, d]));
+const ANALYSIS_SUBSTATIONS: AnalysisSubstation[] = SUBSTATIONS.flatMap((s) => {
+  const d = LOAD_BY_ID.get(s.id);
+  if (!d || !d.installedMva) return [];
+  // nightUtilisation is DERIVED here, not carried: SubstationLoadDetail does
+  // not have it and AnalysisSubstation needs it. Deriving beats widening the
+  // source type, because the two shapes disagree on purpose — one describes a
+  // node for display, the other for filtering. Null in, null out: a node with
+  // no night peak (Sendhwa) must never read as 0% utilised.
+  const util =
+    d.nightPeakMva && d.installedMva && d.installedMva.v > 0
+      ? { ...d.nightPeakMva, v: (d.nightPeakMva.v / d.installedMva.v) * 100, unit: "%" }
+      : null;
+  return [{
+    id: s.id, name: s.name,
+    voltageClass: d.voltageClass ?? String(s.voltageKv),
+    lat: s.lat, lon: s.lon,
+    installedMva: d.installedMva, nightPeakMva: d.nightPeakMva,
+    spareAtNightMva: d.spareAtNightMva, nightUtilisation: util,
+    // d.observationCount is the real count of months observed. s.series.length
+    // is only the months whose LABEL parsed, which is 40 of 54 — using it here
+    // would silently undercount by a quarter.
+    minMva: d.minMva, observationCount: d.observationCount, quality: s.quality,
+  }];
+});
 
 const ROLE_LABEL: Record<Role, string> = {
   operator: "Operator",
@@ -114,7 +153,13 @@ export default function Home() {
           </div>
         </TabsContent>
 
-        <TabsContent value="act3">
+        <TabsContent value="act3" className="space-y-6">
+          {/* Ask a question of the data, then read the verdicts. Order is
+              deliberate: the legacy app lost its scenario query in the rebuild
+              and the tool became something you could only read, never
+              interrogate. */}
+          <AnalysisPanel substations={ANALYSIS_SUBSTATIONS} />
+          <TimelineSimulator subs={SUBSTATIONS} />
           <FactorCard />
         </TabsContent>
       </main>

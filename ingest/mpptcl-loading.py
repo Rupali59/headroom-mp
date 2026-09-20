@@ -383,10 +383,87 @@ def one(label: str, href: str) -> dict:
                 "error": f"{type(e).__name__}: {e}", "secs": round(time.time() - t0, 1)}
 
 
+def write_output(payload_extra: dict, allrows: list[dict], month_resolution: dict) -> None:
+    OUT.mkdir(exist_ok=True)
+    payload = {
+        "source": "MPPTCL / MP Transco, EHV Sub-Station Loading",
+        "index_url": INDEX,
+        "retrieved": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "limits": [
+            "Simultaneous maximum is transformer loading, not drawal headroom for a new consumer.",
+            "Rows are per voltage class; aggregate or class-select deliberately.",
+            "A substation peaking in daytime gives no direct 02:00 figure; MIN MVA is the floor.",
+            "`month` is the DATA-DERIVED month (modal peak_date), not MPPTCL's index-page label — "
+            "see `published_label` on every row and this file's header, 2026-09-20.",
+        ],
+        "month_resolution": month_resolution,
+        "rows": allrows,
+    }
+    payload.update(payload_extra)
+    (OUT / "mpptcl-loading.json").write_text(json.dumps(payload, indent=1))
+
+
+def print_row_stats(allrows: list[dict]) -> None:
+    subs = {r["substation"] for r in allrows}
+    withcap = sum(1 for r in allrows if r["installed_mva"] is not None)
+    night = [r for r in allrows if r.get("peak_is_night")]
+    print(f"rows {len(allrows)}   distinct substations {len(subs)}")
+    if allrows:
+        print(f"installed capacity populated: {withcap}/{len(allrows)} ({withcap/len(allrows):.0%})")
+        print(f"rows whose peak fell 19:00-06:00: {len(night)} ({len(night)/len(allrows):.0%})")
+
+
+def print_month_resolution(month_resolution: dict) -> None:
+    print(f"\nmonth resolution: {month_resolution['files_resolved']} files resolved from their "
+          f"own peak_date, {month_resolution['files_unresolved_kept_scraped_label']} kept the "
+          f"scraped label (no dated rows), "
+          f"{month_resolution['files_where_scraped_label_disagreed_with_data']} of the resolved "
+          f"files had a scraped label that DISAGREED with the data (see published_label per row)")
+
+
+def reprocess_existing() -> int:
+    """`--reprocess-existing` — see file header. Re-derives month /
+    published_label on the JSON already on disk, no network call. Cannot
+    recover an empty-ok file's identity (see `find_empty_ok_files()`'s
+    docstring) since that information never survives into `rows`."""
+    path = OUT / "mpptcl-loading.json"
+    if not path.exists():
+        print(f"nothing to reprocess: {path} does not exist — run a full fetch first")
+        return 1
+    payload = json.loads(path.read_text())
+    allrows = payload["rows"]
+    already_reprocessed = any("published_label" in r for r in allrows)
+    if already_reprocessed:
+        print(f"{path} already carries published_label — re-deriving anyway (idempotent).")
+        # Re-derive from published_label, not from the already-corrected
+        # month, so running this twice can't compound a correction.
+        for r in allrows:
+            r["month"] = r["published_label"]
+
+    month_resolution = apply_month_resolution(allrows)
+    payload["month_resolution"] = month_resolution
+    if "limits" in payload and not any("published_label" in lim for lim in payload["limits"]):
+        payload["limits"].append(
+            "`month` is the DATA-DERIVED month (modal peak_date), not MPPTCL's index-page label — "
+            "see `published_label` on every row and this file's header, 2026-09-20."
+        )
+    path.write_text(json.dumps(payload, indent=1))
+
+    print_month_resolution(month_resolution)
+    print_row_stats(allrows)
+    print(f"\nrewrote {path} in place (no network call)")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--reprocess-existing", action="store_true",
+                     help="Fix month/published_label on the existing JSON, no network call.")
     args = ap.parse_args()
+
+    if args.reprocess_existing:
+        return reprocess_existing()
 
     print(f"index: {INDEX}")
     files = discover()
@@ -406,36 +483,30 @@ def main() -> int:
 
     ok = [r for r in results if r["ok"]]
     bad = [r for r in results if not r["ok"]]
+    empty_ok = find_empty_ok_files(results)  # rule:discernment-checks §2 — name the silent zero
     allrows = [dict(row, month=r["month"], source_url=r["url"])
                for r in ok for row in r["rows"]]
 
-    OUT.mkdir(exist_ok=True)
-    (OUT / "mpptcl-loading.json").write_text(json.dumps({
-        "source": "MPPTCL / MP Transco, EHV Sub-Station Loading",
-        "index_url": INDEX,
-        "retrieved": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "months_ok": len(ok), "months_failed": len(bad),
-        "failures": [{"month": r["month"], "error": r["error"]} for r in bad],
-        "limits": [
-            "Simultaneous maximum is transformer loading, not drawal headroom for a new consumer.",
-            "Rows are per voltage class; aggregate or class-select deliberately.",
-            "A substation peaking in daytime gives no direct 02:00 figure; MIN MVA is the floor.",
-        ],
-        "rows": allrows,
-    }, indent=1))
+    month_resolution = apply_month_resolution(allrows)
 
-    subs = {r["substation"] for r in allrows}
-    withcap = sum(1 for r in allrows if r["installed_mva"] is not None)
-    night = [r for r in allrows if r.get("peak_is_night")]
-    print(f"\nmonths ok {len(ok)}  failed {len(bad)}")
-    print(f"rows {len(allrows)}   distinct substations {len(subs)}")
-    print(f"installed capacity populated: {withcap}/{len(allrows)}"
-          f" ({withcap/len(allrows):.0%})" if allrows else "")
-    print(f"rows whose peak fell 19:00-06:00: {len(night)}"
-          f" ({len(night)/len(allrows):.0%})" if allrows else "")
+    write_output(
+        {
+            "months_ok": len(ok), "months_failed": len(bad),
+            "failures": [{"month": r["month"], "error": r["error"]} for r in bad],
+            "empty_ok_files": empty_ok,
+        },
+        allrows,
+        month_resolution,
+    )
+
+    print(f"\nmonths ok {len(ok)}  failed {len(bad)}  ok-but-empty {len(empty_ok)}")
+    print_row_stats(allrows)
+    print_month_resolution(month_resolution)
     print(f"\nwrote {OUT/'mpptcl-loading.json'}")
     for r in bad:
         print(f"  FAILED {r['month']}: {r['error'][:100]}")
+    for e in empty_ok:
+        print(f"  OK BUT EMPTY {e['month']}: {e['url']} ({e['bytes']} bytes, 0 rows parsed)")
     return 0
 
 

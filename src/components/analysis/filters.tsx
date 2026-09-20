@@ -11,6 +11,15 @@
  * voltage chips and minimum-headroom slider are the direct ancestors of
  * this component.
  *
+ * DATA-QUALITY CONTROL, resolved mid-session: task brief item 3 said "if
+ * that field is not in types.ts yet, build the control and leave it
+ * disabled ... do not invent the field." It was not in `types.ts` when
+ * this lane started; `DataQuality` + `SubstationLoad.quality` landed
+ * while this file was being written (see `src/lib/analysis.ts`'s "LIVE
+ * UPDATE" note). So the control below is fully wired, not disabled —
+ * disabling a control against data that now genuinely exists would be
+ * the more dishonest state, not the safer one.
+ *
  * shadcn primitives per design-system/MASTER.md §4 ("Minimum-headroom
  * filter" -> `slider`) — no raw `button`/`input`/`select`. Live result
  * count per task 3: "Show the live result count: 'showing 84 of 432'."
@@ -20,9 +29,8 @@
  * `<button>`s with `aria-pressed`, reachable by Tab, not `<div onClick>`.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { cn } from "cn";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -38,10 +46,9 @@ import {
   type SubstationFilters,
 } from "@/lib/analysis";
 
-/** Voltage classes offered by the chip row. Not derived from `subs` alone
- * (a filtered/empty `subs` shouldn't make a chip disappear and become
- * unreachable) — instead the union of every class actually present across
- * the FULL unfiltered set passed in, computed once. */
+/** Every voltage class actually present across the FULL unfiltered set
+ * passed in — computed once, so a chip never disappears just because the
+ * current filter selection has temporarily emptied the visible list. */
 function voltageClassesIn(subs: readonly AnalysisSubstation[]): string[] {
   const set = new Set(subs.map((s) => s.voltageClass));
   // Numeric-descending by the leading kV number when parseable (matches
@@ -60,7 +67,11 @@ const UTIL_SLIDER_MAX = 150; // % — wide enough to show over-100% exceptions m
 const UTIL_SLIDER_STEP = 5;
 
 export interface FiltersState {
-  voltageClasses: Set<string>;
+  /** `null` = every voltage class (the pristine default — matches the
+   * legacy app's all-chips-on start state). A `Set` is an explicit
+   * selection; an EMPTY `Set` would mean "show none", which the UI below
+   * never actually produces — see `toggleVoltage()`'s guard. */
+  voltageClasses: Set<string> | null;
   minSpareMva: number; // 0 = "show all", matches legacy `minH` semantics.
   maxNightUtilisation: number; // UTIL_SLIDER_MAX = "show all".
   quality: "all" | "exclude-exceptions";
@@ -68,7 +79,7 @@ export interface FiltersState {
 
 /** `FiltersState` with every constraint at its "show all" default. */
 export const DEFAULT_FILTERS_STATE: FiltersState = {
-  voltageClasses: new Set(),
+  voltageClasses: null,
   minSpareMva: 0,
   maxNightUtilisation: UTIL_SLIDER_MAX,
   quality: "all",
@@ -96,6 +107,7 @@ export function toSubstationFilters(state: FiltersState): SubstationFilters {
       state.maxNightUtilisation < UTIL_SLIDER_MAX
         ? state.maxNightUtilisation
         : null,
+    quality: state.quality,
   };
 }
 
@@ -116,7 +128,10 @@ export function Filters({
   );
 
   function toggleVoltage(v: string) {
-    const next = new Set(value.voltageClasses);
+    // `null` means "every class" — expand to an explicit set first so a
+    // single click has something concrete to remove from.
+    const current = value.voltageClasses ?? new Set(voltageOptions);
+    const next = new Set(current);
     if (next.has(v)) {
       // Mirrors the legacy app's guard (`if(set.size===1)return`) — never
       // let the operator filter every class away by mis-click; deselecting
@@ -126,7 +141,16 @@ export function Filters({
     } else {
       next.add(v);
     }
-    onChange({ ...value, voltageClasses: next });
+    // Normalise "every option selected again" back to `null`, so the
+    // pristine and the manually-reselected-everything states read as the
+    // same thing rather than diverging quietly.
+    const isEverything =
+      next.size === voltageOptions.length &&
+      voltageOptions.every((o) => next.has(o));
+    onChange({
+      ...value,
+      voltageClasses: isEverything ? null : next,
+    });
   }
 
   return (
@@ -149,7 +173,9 @@ export function Filters({
           className="flex flex-wrap gap-2"
         >
           {voltageOptions.map((v) => {
-            const on = value.voltageClasses.has(v);
+            const on = value.voltageClasses
+              ? value.voltageClasses.has(v)
+              : true;
             return (
               <button
                 key={v}
@@ -196,9 +222,7 @@ export function Filters({
 
       <div className="space-y-2">
         <div className="flex items-baseline justify-between gap-3">
-          <Label htmlFor="filter-max-util">
-            Maximum night utilisation
-          </Label>
+          <Label htmlFor="filter-max-util">Maximum night utilisation</Label>
           <span className="font-mono text-xs tabular-nums text-ink-3">
             {value.maxNightUtilisation >= UTIL_SLIDER_MAX
               ? "show all"
@@ -223,40 +247,22 @@ export function Filters({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="filter-quality">
-          Data quality{" "}
-          <Badge
-            variant="outline"
-            className="border-transparent bg-panel-2 px-1.5 text-[10px] uppercase tracking-wide text-ink-3"
-          >
-            not wired
-          </Badge>
-        </Label>
-        {/*
-          DISABLED ON PURPOSE — task brief, item 3: "Lane H is adding a
-          quality flag for the readings above 100% of installed capacity
-          ... if that field is not in types.ts yet, build the control and
-          leave it disabled with a comment, do not invent the field."
-
-          UPDATE, same session: `src/lib/types.ts`'s `DataQuality` and
-          `SubstationLoad.quality` landed WHILE this lane was in progress,
-          and `src/lib/analysis.ts`'s `filterSubstations()` / `quality`
-          option is now fully wired against them (see that file). This
-          control stays disabled anyway, deliberately, because THIS
-          component's own `FiltersState` (above) was designed before that
-          field existed and has no slot for it — wiring it here would mean
-          silently changing this component's contract mid-review rather
-          than as a reviewed step. Enabling it is a two-line change:
-          add `quality: "all" | "exclude-exceptions"` to `FiltersState`,
-          thread it through `toSubstationFilters()`, and remove `disabled`
-          below. Left as the next integration step rather than done here.
-        */}
-        <Select disabled defaultValue="all">
-          <SelectTrigger
-            id="filter-quality"
-            aria-label="Data quality filter — not yet wired"
-          >
-            <SelectValue>All readings</SelectValue>
+        <Label htmlFor="filter-quality">Data quality</Label>
+        <Select
+          value={value.quality}
+          onValueChange={(v) =>
+            onChange({
+              ...value,
+              quality: v as FiltersState["quality"],
+            })
+          }
+        >
+          <SelectTrigger id="filter-quality" aria-label="Data quality">
+            <SelectValue>
+              {value.quality === "all"
+                ? "All readings"
+                : "Exclude data-quality exceptions"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All readings</SelectItem>
@@ -265,6 +271,12 @@ export function Filters({
             </SelectItem>
           </SelectContent>
         </Select>
+        <p className="text-xs text-ink-3">
+          DATA.md caveat 5: some readings exceed 100% of installed capacity
+          (e.g. 132KV Salamatpur, 183%) — likely a sheet error, not real
+          operation. Excluding them removes the row rather than showing a
+          confident but untrustworthy number.
+        </p>
       </div>
     </div>
   );

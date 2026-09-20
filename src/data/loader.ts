@@ -44,9 +44,9 @@
  * Of the three candidate rules DATA.md itself names ("the highest class
  * present? the class carrying most capacity? the class a 100 MW load would
  * connect at?"), this file picks the second — THE CLASS CARRYING THE MOST
- * INSTALLED CAPACITY, averaged across every month that class was reported —
- * and gives it precedence over the label's own embedded voltage-class
- * prefix or over "highest kV number present". Justification:
+ * INSTALLED CAPACITY, taken as the MEDIAN across every month that class was
+ * reported — and gives it precedence over the label's own embedded
+ * voltage-class prefix or over "highest kV number present". Justification:
  *
  *   - A 100 MW load connects where there is a transformer big enough to
  *     carry it; installed MVA is the direct, measured proxy for that, where
@@ -55,18 +55,21 @@
  *   - Measured directly against all 432 raw labels while writing this file:
  *     "highest kV class present" and "highest-capacity class" agree for
  *     431 of 432 labels (99.8%). The one disagreement, "400KV CHHEGAON",
- *     has a HIGHER average installed MVA on its 220KV rows (654.1) than its
+ *     has a HIGHER median installed MVA on its 220KV rows (680.0) than its
  *     own 400KV rows (630.0) — i.e. the site's name and its nameplate
  *     400kV transformer are not where the capacity actually sits. Capacity
  *     is the more honest signal exactly because this file is a DATA
  *     decision, not a naming one.
- *   - Averaging across months (rather than taking one month's max) is
- *     robust to a single bad `installed_mva` reading skewing the class
- *     choice — DATA.md caveat 5 already establishes the sheet contains
- *     wrong readings, so the class-selection rule should not be fragile to
- *     the same class of error.
+ *   - The MEDIAN, not the mean, across months (and not one month's max
+ *     either) is robust to a single bad `installed_mva` reading skewing the
+ *     class choice — DATA.md caveat 5 already establishes the sheet
+ *     contains wrong readings, so the class-selection rule should not be
+ *     fragile to the same class of error. This is not theoretical: an
+ *     earlier version of this file used the mean, and `tests/loader.test.ts`
+ *     caught it failing exactly this way — see `pickPrimaryClass()`'s own
+ *     docstring for the worked failure.
  *
- * Ties (equal average installed MVA) break toward the higher kV number,
+ * Ties (equal median installed MVA) break toward the higher kV number,
  * then alphabetically, for full determinism — see `pickPrimaryClass()`.
  *
  * Once the primary class is chosen for a label, ALL of that label's other
@@ -337,33 +340,55 @@ function kvNumber(voltageClass: string): number {
   return m ? Number(m[1]) : -1;
 }
 
+/** Middle value of a sorted numeric array (mean of the two middle values on
+ * an even count). Used by `pickPrimaryClass()` — see that function's
+ * docstring for why the median, not the mean, is the robust choice here. */
+function median(values: readonly number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
 /**
  * AGGREGATION CHOICE #1 (see file header) — picks the single voltage class
  * that represents a raw substation label across its WHOLE series: the
- * class with the highest mean `installed_mva`, ties broken by higher kV
+ * class with the highest MEDIAN `installed_mva`, ties broken by higher kV
  * number, then lexicographically for full determinism.
+ *
+ * Median, not mean: caught by this file's own test suite. A first version
+ * used the mean, and `tests/loader.test.ts`'s outlier-robustness case
+ * failed against it — a single wrongly-recorded month in an otherwise
+ * consistent class's series was enough to swing that class's MEAN past a
+ * genuinely larger class, because a mean has no resistance to one bad
+ * value. The median does: with 4 normal readings and 1 outlier, the
+ * outlier is never the middle value. (A class with only one or two
+ * observations total still has no protection — there is nothing to take a
+ * median OF — but that is a data-sparsity limit, not a flaw a statistic
+ * can fix, and does not occur in the real dataset's one genuine
+ * class-choice disagreement, "400KV CHHEGAON": both its 400KV and 220KV
+ * rows have 54 observations each, and the 220KV median (680) still beats
+ * the 400KV median (630) exactly as the mean did.)
  */
 export function pickPrimaryClass(rows: readonly LoadingDoc[]): string {
-  const byClass = new Map<string, { sum: number; n: number }>();
+  const byClass = new Map<string, number[]>();
   for (const r of rows) {
     if (r.installed_mva === null) continue;
-    const acc = byClass.get(r.voltage_class) ?? { sum: 0, n: 0 };
-    acc.sum += r.installed_mva;
-    acc.n += 1;
-    byClass.set(r.voltage_class, acc);
+    const values = byClass.get(r.voltage_class) ?? [];
+    values.push(r.installed_mva);
+    byClass.set(r.voltage_class, values);
   }
   let best: string | null = null;
-  let bestAvg = -Infinity;
-  for (const [cls, { sum, n }] of byClass) {
-    const avg = sum / n;
+  let bestMedian = -Infinity;
+  for (const [cls, values] of byClass) {
+    const med = median(values);
     if (
       best === null ||
-      avg > bestAvg ||
-      (avg === bestAvg && kvNumber(cls) > kvNumber(best)) ||
-      (avg === bestAvg && kvNumber(cls) === kvNumber(best) && cls < best)
+      med > bestMedian ||
+      (med === bestMedian && kvNumber(cls) > kvNumber(best)) ||
+      (med === bestMedian && kvNumber(cls) === kvNumber(best) && cls < best)
     ) {
       best = cls;
-      bestAvg = avg;
+      bestMedian = med;
     }
   }
   // Rows with no installed_mva anywhere for this label: fall back to

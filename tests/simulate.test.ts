@@ -22,7 +22,6 @@ import {
   monthSortKey,
   POWER_FACTOR,
   simulateAt,
-  WINTER_CLUSTER_THRESHOLD,
 } from "../src/lib/simulate";
 import type { DataQuality, MonthlyObservation, Substation } from "../src/lib/types";
 

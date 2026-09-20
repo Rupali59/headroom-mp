@@ -13,6 +13,18 @@
  * D2: the top bar carries one time claim (REPLAY) and the role switch
  * sits to its left at full contrast, because it scopes every number below
  * it and was previously the smallest, faintest control on the screen.
+ *
+ * DATA WIRING — Lane F. `GridMap` is the only one of the five Act
+ * components that accepts substation data as a prop
+ * (`substations?: Substation[]`, `loadDetails?: SubstationLoadDetail[]`);
+ * `ExtractionPanel`, `BlockedSources`, `Worklist` and `FactorCard` all
+ * take zero props by their own current signatures — each reads its own
+ * data internally (a recorded artifact, `worklist-store`, or
+ * `factors-analysis.json` respectively; see each file's own header). So
+ * "pass the composed data through" resolves, today, to wiring `GridMap`
+ * alone — the other four already have their own data sources and were
+ * never blocked on this seam the way `GridMap` was. See `src/app/data.ts`
+ * for where `SUBSTATIONS`/`LOAD_DETAILS` come from and why.
  */
 
 import {
@@ -29,6 +41,7 @@ import { BlockedSources } from "@/components/blocked-sources";
 import { GridMap } from "@/components/map/grid-map";
 import { Worklist } from "@/components/worklist/worklist";
 import { FactorCard } from "@/components/factor-card";
+import { SUBSTATIONS, LOAD_DETAILS } from "./data";
 
 const ROLE_LABEL: Record<Role, string> = {
   operator: "Operator",
@@ -94,7 +107,7 @@ export default function Home() {
 
         <TabsContent value="act2">
           <div className="grid gap-4 lg:grid-cols-[1fr_330px]">
-            <GridMap />
+            <GridMap substations={SUBSTATIONS} loadDetails={LOAD_DETAILS} />
             <aside role="complementary" aria-label="Action">
               <Worklist />
             </aside>

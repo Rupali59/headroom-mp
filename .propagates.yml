@@ -1,0 +1,96 @@
+# Propagation sidecar — Headroom MP.
+# Schema: ~/Documents/GitHub/propagate/propagates.schema.json  (additionalProperties: false —
+# an undeclared key is rejected silently and every edge in this file stops firing).
+#
+# Created 2026-09-20, the day this directory became its own git repo
+# (Rupali59/headroom-mp, public). Until then it was inside Rupali/, whose .gitignore
+# line 24 is `/*`, so nothing here was visible to git and an untracked ledger cannot be
+# committed with the change that caused it — which is the whole point of the pattern.
+#
+# WHY THESE EDGES EXIST, SPECIFICALLY.
+# Every one of them is a coupling that ALREADY drifted during the single session that
+# built this project, and each was caught by a human or a subagent reading two files
+# together rather than by any tool:
+#
+#   * DESIGN.md asserted a confidence ladder that DATA.md had superseded
+#   * DESIGN.md said "ten factors" in two summary lines against its own twelve-row table
+#   * DESIGN.md called API page citations "the largest single saving in the build";
+#     the probe built to test that claim returned zero citations, twice
+#   * design-system/MASTER.md said `--base radix` was the shadcn default; it is not
+#   * MASTER.md's npmrc fix said `npm_config_userconfig=`; only `=/dev/null` works
+#
+# Per rule:adversarial-review-reads-the-ledger, a review that ends without new
+# declarations "found defects but left the mechanism that produced them intact."
+# This file is the mechanism.
+
+workspace: true
+
+sources:
+  DATA.md:
+    concepts:
+      - measured-not-modelled
+      - confidence-ladder
+    propagates_to:
+      - path: DESIGN.md
+        why: "DATA.md supersedes DESIGN.md's confidence ladder, coincidence model, hatching set and Blocked sources content. This exact edge drifted twice in one day: the obsolete voltage-class `derived` tier, and the disproven citations claim."
+        kind: prose
+      - path: src/lib/risk.ts
+        why: "the five weak-factor thresholds and the >=2-unknown hatch rule are specified in DATA.md 'Risk, revised' and implemented here. Prose and code disagreeing indefinitely is what tests/risk.test.ts pins."
+        kind: code
+      - path: src/data/loader.ts
+        why: "DATA.md fixes the per-voltage-class aggregation rule and the night band (19:00-06:00). The loader implements it. A silent change to either produces different numbers with no error."
+        kind: code
+      - path: BUILD.md
+        why: "BUILD.md's lane assignments reference DATA.md's data model by name; a rung added or removed there changes what lanes A, C and E are building against."
+        kind: prose
+
+  ingest/mpptcl-loading.py:
+    concepts:
+      - mpptcl-ingest
+    propagates_to:
+      - path: DATA.md
+        why: "every figure in DATA.md's 'What we now hold' block (27,680 rows / 55 months / 432 substations / 100% capacity / peak dates) is output of this script. Change the parser and those numbers are stale, silently."
+        kind: prose
+      - path: src/data/loader.ts
+        why: "the emitted row shape (installed_mva, peak_mva, peak_hour, peak_date, peak_is_night, spare_at_peak_mva) is this script's contract with the build-time aggregator."
+        kind: code
+      - path: ingest/mongo-load.ts
+        why: "collection shape and the deterministic _id derivation read this script's output directly."
+        kind: code
+
+  design-system/MASTER.md:
+    concepts:
+      - design-tokens
+      - wcag-aa
+    propagates_to:
+      - path: src/app/globals.css
+        why: "MASTER.md §2 is the single source for colour tokens; globals.css is where they are emitted once into Tailwind v4 @theme. 13 tokens had already diverged across two files before this was written, two of them by NAME (--ok/--good), which is the silent kind."
+        kind: code
+      - path: src/components/ui
+        why: "MASTER.md §6 commits to WCAG 2.2 AA and the 44px target-size sweep. shadcn regenerates these components with its own defaults (button 36px, slider thumb 12px), so any `shadcn add` re-run silently reverts the sweep."
+        kind: code
+      - path: DESIGN.md
+        why: "DESIGN.md's Stack section restates MASTER.md's shadcn install commands and flags. It has already carried two wrong ones (--base radix as default, the npmrc fix)."
+        kind: prose
+
+  BUILD.md:
+    concepts:
+      - lane-ownership
+    propagates_to:
+      - path: DESIGN.md
+        why: "BUILD.md supersedes DESIGN.md's Stack, Next Steps and Distribution sections. DESIGN.md's header says so; if BUILD.md's architecture changes again, that header is the thing that goes stale first."
+        kind: prose
+      - path: package.json
+        why: "BUILD.md fixes the script contract (type-check must be `next typegen && tsc --noEmit`, plain tsc fails on a clean tree) and reserves dependency installs to a single owner."
+        kind: code
+
+  extraction-test/extract.ts:
+    concepts:
+      - api-claims
+    propagates_to:
+      - path: DESIGN.md
+        why: "this probe exists to test three API claims DESIGN.md makes. It has already disproven one (citations return nothing through a strict tool, because citations attach to text blocks and a tool_use response has none). If the probe's result changes, the doc must."
+        kind: prose
+      - path: extraction-test/README.md
+        why: "the README states what C1, C2 and C3 assert. C1's status is now NOT CONFIRMED and the README must not outlive that."
+        kind: prose

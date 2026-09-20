@@ -116,6 +116,18 @@ risk = count(Weak)          0 green · 1-2 amber · 3+ red
 Every one of factors 1-3 is now computable from measured data. `src/lib/risk.ts` (Lane 0)
 holds the arithmetic and `tests/risk.test.ts` pins it.
 
+## Provenance: what the page numbers actually are
+
+**Not from the citations API.** Measured 2026-09-20, twice: `citations:{enabled:true}`
+returns zero citations when the payload comes back through a strict tool, because
+citations attach to `text` blocks and a tool-use response has none. The page number on
+each extracted record is the **model self-reporting which page it read the row from**,
+inside the tool schema.
+
+That is still useful and it verified correct on inspection, but describe it accurately:
+a model claim, checkable against the document, not a platform guarantee. Do not say
+"the API cites the page" on stage.
+
 ## Caveats that ride with every number
 
 Non-negotiable, and they go on the card, not in a footnote:
@@ -129,6 +141,15 @@ Non-negotiable, and they go on the card, not in a footnote:
 3. **A substation peaking at 09:00 gives no direct 02:00 figure.** `min_mva` is the
    floor; the 55-month series gives the seasonal shape.
 4. **Winter sample is thin** (n=115). State it whenever the +16% is shown.
+5. **Readings above 100% of installed capacity exist in the source.** `132KV SALAMATPUR`
+   reads 183% (73.25 of 40 MVA) and `400KV KIRNAPUR` 101%. Short-term transformer
+   overload makes 101% plausible; 183% is not, and means either the capacity or the
+   reading is wrong in MPPTCL's sheet. **Clamp or flag anything over 100% as a
+   data-quality exception** — never render it as a confident red node. The most extreme
+   thing on screen must not be the least trustworthy.
+6. **Sendhwa disagrees between pipelines.** The worked table above shows a 93 MVA night
+   peak; the build-time loader finds no night peak for `220KV SENDHWA` across 54 months.
+   One of the two is wrong. Recheck against the source before this node is shown.
 
 ## What the ask becomes
 

@@ -589,11 +589,18 @@ Verified against the bundled `claude-api` skill, not recalled.
   `{type:"document", source:{type:"base64", media_type:"application/pdf", data:<b64>},
   title, citations:{enabled:true}}`. Limits 32 MB per request, 600 pages. The base64
   string must carry no newlines.
-- **Page numbers come from the API.** `citations:{enabled:true}` returns `page_location`
-  with 1-indexed `start_page_number` / `end_page_number` per cited span. Largest single
-  saving in the build — but it delivers **page, not URL or date**. The response carries
-  `document_index` and `document_title` only, so the URL and as-of mapping stays yours.
-  The brief's *"document URL + page + date"* is two-thirds yours and one-third free.
+- **DISPROVEN 2026-09-20: the citations API returns NOTHING for this request shape.**
+  Ran twice against the real fixture: zero citations both times. The reason is
+  structural, not a misconfiguration — **API citations attach to `text` blocks, and a
+  response that returns its payload through a `tool_use` block has no text blocks for a
+  citation to attach to.** So there are TWO mutual exclusions here, and the second fails
+  silently: `citations` vs `output_config.format` (a documented 400), and `citations` vs
+  strict-tool output (returns nothing at all).
+  **What actually produces the page numbers:** the model self-reports `page` inside the
+  tool schema. All 44 recorded records carry one and they are correct — but that is a
+  MODEL CLAIM, not a platform guarantee, and it must be described that way. An earlier
+  draft of this document called API page citations "the largest single saving in the
+  build". It was wrong.
 - **Citations are all-or-none** across document blocks in a request. If Act 1 sends both
   CTUIL documents, both need `citations:{enabled:true}`.
 - **The non-obvious constraint: citations and structured outputs are mutually

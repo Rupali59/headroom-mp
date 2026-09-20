@@ -37,9 +37,39 @@ HONEST LIMITS - keep these attached to every number this produces
 3. A substation peaking at 09:00 tells you nothing directly about its 02:00
    load. MIN MVA gives the floor; the 60-month series gives the seasonal shape.
 
+MONTH LABEL vs MONTH THE DATA IS ABOUT - these are NOT the same thing
+----------------------------------------------------------------------
+Found by Lane L, fixed here 2026-09-20. `discover()` scrapes the label text
+MPPTCL's index page hangs next to each file's link. That text is the
+PUBLICATION month, not the month the file's rows report on: a file labelled
+"January'2026" contains December 2025 data. Verified systematic — 40 of 40
+labels that parsed cleanly as "Month'YYYY" were wrong, every one by exactly
+-1 month, at 100% confidence (see `ingest/resolve-months.py` /
+`ingest/README-months.md` for the full investigation and worked evidence).
+
+The fix: `resolve_true_month()` below derives each file's real month from
+the DATA, not the label — every row already carries `peak_date` (~99%
+populated), the day its SIMULTANEOUS MAXIMUM was recorded, and a file's true
+month is the modal year-month across its own rows' `peak_date`. The scraped
+index-page label is kept too, as `published_label` on every row, per
+DATA.md-adjacent discipline: the disagreement is itself information, not
+noise to discard. `month` is now always the resolved (corrected) label when
+resolvable; `published_label` is always the original scraped text, whether
+or not the two agree.
+
 Usage:
     python3 ingest/mpptcl-loading.py            # all months, parallel
     python3 ingest/mpptcl-loading.py --limit 3  # smoke test
+    python3 ingest/mpptcl-loading.py --reprocess-existing
+        # No network call. Re-derives month/published_label (and the
+        # empty-ok-file caveat below) on the ALREADY-FETCHED
+        # data-local/mpptcl-loading.json in place, using only the
+        # peak_date values it already holds. Cannot recover the identity
+        # of a file that fetched ok but produced zero rows (see
+        # `find_empty_ok_files()`) — that identity only exists in a live
+        # run's in-memory results, never in the written JSON. Use this mode
+        # to apply a month-resolution fix without re-hitting MPPTCL's site;
+        # use a full run to also close the empty-ok gap.
 """
 
 from __future__ import annotations
@@ -234,6 +264,108 @@ def _shape(rows: dict[int, dict[int, str]]) -> list[dict]:
             "spare_at_peak_mva": None if (cap is None or peak is None) else round(cap - peak, 2),
         })
     return out
+
+
+# ---------------------------------------------------------------- month resolution
+
+MONTH_NAMES = [
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december",
+]
+
+
+def resolve_true_month(rows_for_file: list[dict]) -> tuple[str | None, float | None]:
+    """A file's real month, derived from its OWN rows' `peak_date` — never
+    from the scraped index-page label. Modal year-month across every dated
+    row; returns (None, None) when the file has no dated rows at all (the
+    scraped label is the only fallback left in that case — see caller).
+
+    Matches `ingest/resolve-months.py`'s `modal_yearmonth()` method exactly
+    (that script investigated this independently and is the source of the
+    "-1 month, systematic" finding this function fixes at the source).
+    """
+    dated = [r["peak_date"] for r in rows_for_file if r.get("peak_date")]
+    if not dated:
+        return None, None
+    counts: dict[str, int] = {}
+    for d in dated:
+        ym = d[:7]  # YYYY-MM
+        counts[ym] = counts.get(ym, 0) + 1
+    top_ym, top_n = max(counts.items(), key=lambda kv: kv[1])
+    share = round(100.0 * top_n / len(dated), 1)
+    year, month_num = int(top_ym[:4]), int(top_ym[5:7])
+    label = f"{MONTH_NAMES[month_num - 1].capitalize()}'{year}"
+    return label, share
+
+
+def apply_month_resolution(allrows: list[dict]) -> dict:
+    """Rewrites every row's `month` to its resolved (data-derived) label
+    in place, moving the original scraped text to `published_label`.
+    Returns a summary (per-file resolution + disagreement count) for the
+    output JSON and console report — never applies the fix silently.
+
+    A file with no dated rows keeps its scraped label as `month` (nothing
+    better exists) and gets `published_label` equal to `month` too, so
+    "resolved" and "fell back to the scraped label" are distinguishable by
+    checking `month_resolution.unresolved_files`, never by a bare null.
+    """
+    by_url: dict[str, list[dict]] = {}
+    for r in allrows:
+        by_url.setdefault(r["source_url"], []).append(r)
+
+    per_file: list[dict] = []
+    disagreements = 0
+    unresolved_files: list[str] = []
+    for url, rs in sorted(by_url.items()):
+        scraped_label = rs[0]["month"]
+        resolved_label, confidence = resolve_true_month(rs)
+        if resolved_label is None:
+            unresolved_files.append(url)
+            for r in rs:
+                r["published_label"] = scraped_label
+                # month left as-is (the scraped label) — no better signal exists
+            per_file.append({
+                "source_url": url, "published_label": scraped_label,
+                "resolved_month": None, "confidence_pct": None, "agrees": None,
+            })
+            continue
+        agrees = resolved_label == scraped_label
+        if not agrees:
+            disagreements += 1
+        for r in rs:
+            r["published_label"] = scraped_label
+            r["month"] = resolved_label
+        per_file.append({
+            "source_url": url, "published_label": scraped_label,
+            "resolved_month": resolved_label, "confidence_pct": confidence,
+            "agrees": agrees,
+        })
+
+    return {
+        "method": "modal year-month of each row's own peak_date; scraped "
+                   "index-page label kept as published_label, never trusted "
+                   "for the month itself (see file header, 2026-09-20 fix)",
+        "files_resolved": len(by_url) - len(unresolved_files),
+        "files_unresolved_kept_scraped_label": len(unresolved_files),
+        "files_where_scraped_label_disagreed_with_data": disagreements,
+        "per_file": per_file,
+    }
+
+
+def find_empty_ok_files(results: list[dict]) -> list[dict]:
+    """DATA.md/rule:discernment-checks §2: 'no rows' and 'no rows BECAUSE'
+    are different facts. A file that downloads and parses as a valid
+    xlsx/zip but whose sheet yields zero data rows reports `ok: True` from
+    `one()` — it is NOT in `bad`/`failures`, so nothing previously named
+    it. This can only be captured here, from the live `results` list,
+    before `allrows` is built — once a file has zero rows, filtering
+    `allrows` by row content leaves no trace of its label or URL at all.
+    """
+    return [
+        {"month": r["month"], "url": r["url"], "bytes": r.get("bytes")}
+        for r in results
+        if r["ok"] and len(r["rows"]) == 0
+    ]
 
 
 # ---------------------------------------------------------------- main

@@ -59,11 +59,25 @@ The demo's own substations, EHV rows, worst night observation:
 | Seoni | 220 kV | 520 | 325 | 195 | 54 |
 | Satna | 220 kV | 480 | 396 | 84 | 54 |
 | Itarsi | 220 kV | 320 | 236 | 84 | 54 |
-| Sendhwa | 220 kV | 160 | 93 | 67 | 54 |
+| ~~Sendhwa~~ | 220 kV | 160 | — | — | 162 | **CORRECTED: no night peak exists.** |
 | Gwalior | 220 kV | 320 | 271 | **49** | 54 |
 | Birsinghpur | 220 kV | 160 | 140.5 | **20** | 54 |
 
-15 of 16. **Birsinghpur at 88% utilised on a winter night is the news**, and it is the
+**Two corrections to this table, measured 2026-09-20 and verified independently:**
+
+* **Sendhwa has no 220 kV night peak at all.** Its 93 MVA readings fall at hour 11 and
+  hour 16 — daytime. Across 162 rows the only night readings belong to its smaller
+  132 kV transformer (21-22 MVA of 63 installed). An earlier version of this table
+  reported a daytime peak as a night one. The loader was right and this document was
+  wrong.
+* **Sagar is 400 kV, not 220 kV.** The 630 MVA figure is correct and it is the 400 kV
+  class's; only the voltage label was wrong. `geometry.ts` carries 220 kV for Sagar and
+  needs the same correction — a ninth mismatch, not among the eight originally named.
+* Conversely **Sendhwa is NOT a voltage-class mismatch**: `geometry.ts` already has 220,
+  matching its measured primary class. Both this document's prose and `geometry.ts`'s own
+  header listed it as mismatched; the code never agreed with either.
+
+14 of 16. **Birsinghpur at 88% utilised on a winter night is the news**, and it is the
 node the plan already wanted flagged for BESS. Indore with 683 MVA spare sitting beside
 it is the whole product.
 
@@ -140,7 +154,12 @@ Non-negotiable, and they go on the card, not in a footnote:
    Aggregate or class-select deliberately, never silently.
 3. **A substation peaking at 09:00 gives no direct 02:00 figure.** `min_mva` is the
    floor; the 55-month series gives the seasonal shape.
-4. **Winter sample is thin** (n=115). State it whenever the +16% is shown.
+4. **Winter sample is NOT as thin as previously stated.** An earlier caveat here said
+   n=115. That was an artefact of the month-label bug: every label is off by one, so
+   true-February files were labelled March and fell out of the winter bucket entirely.
+   Corrected, the winter sample roughly doubles to n~230. **The +16% headline survives**
+   — 16.3% corrected against 16.2% published. The claim was right and the evidence for
+   it is better than we knew. State the corrected n, not the old one.
 5. **Readings above 100% of installed capacity exist in the source.** `132KV SALAMATPUR`
    reads 183% (73.25 of 40 MVA) and `400KV KIRNAPUR` 101%. Short-term transformer
    overload makes 101% plausible; 183% is not, and means either the capacity or the

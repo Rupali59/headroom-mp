@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Headroom MP — Why, What, and What's Still Broken</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0b0d; --bg2:#101216; --panel:#14171c; --line:#23272f; --line2:#2e333d;
+  --ink:#eceae4; --ink2:#a9a8a2; --ink3:#6d6d69;
+  --sun:#f2a541; --sun-dim:rgba(242,165,65,.14);
+  --night:#8b9cff; --night-dim:rgba(139,156,255,.14);
+  --warn:#ff7a6b; --ok:#5fd4a0;
+  --serif:"Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --sans:"IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#f5f3ee; --bg2:#ecE9e2; --panel:#ffffff; --line:#dcd8cf; --line2:#cbc6bb;
+    --ink:#16171a; --ink2:#55565a; --ink3:#8a8a86;
+    --sun:#c77a12; --sun-dim:rgba(199,122,18,.12); --night:#4b5bd6; --night-dim:rgba(75,91,214,.10);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a0b0d; --bg2:#101216; --panel:#14171c; --line:#23272f; --line2:#2e333d;
+  --ink:#eceae4; --ink2:#a9a8a2; --ink3:#6d6d69; --sun:#f2a541; --night:#8b9cff;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-weight:300;line-height:1.6;font-size:17px;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+.mono{font-family:var(--mono)}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+.kicker b{color:var(--sun);font-weight:500}
+
+/* Hero */
+.hero{min-height:92vh;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;padding:80px 0 60px}
+.hero::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(900px 500px at 85% 20%, var(--sun-dim), transparent 60%),
+  radial-gradient(700px 500px at 10% 90%, var(--night-dim), transparent 60%);pointer-events:none}
+.hero .grid-bg{position:absolute;inset:0;opacity:.35;pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:56px 56px;mask-image:radial-gradient(ellipse at 60% 40%, #000 20%, transparent 75%)}
+h1{font-family:var(--serif);font-weight:400;font-size:clamp(44px,7.4vw,96px);line-height:.98;letter-spacing:-.02em;margin:22px 0 28px;max-width:17ch}
+h1 em{color:var(--night);font-style:italic}
+.lede{font-size:clamp(18px,2vw,22px);color:var(--ink2);max-width:58ch}
+.hero-meta{display:flex;gap:28px;flex-wrap:wrap;margin-top:44px;font-family:var(--mono);font-size:12.5px;color:var(--ink3)}
+.hero-meta span b{color:var(--ink);font-weight:500}
+
+/* Sections */
+section{padding:110px 0;border-top:1px solid var(--line)}
+.sec-head{display:grid;grid-template-columns:120px 1fr;gap:24px;margin-bottom:56px}
+.sec-num{font-family:var(--mono);font-size:13px;color:var(--sun);padding-top:14px}
+h2{font-family:var(--serif);font-weight:400;font-size:clamp(34px,4.6vw,58px);line-height:1.04;letter-spacing:-.015em;margin:0;max-width:20ch}
+h2 em{font-style:italic;color:var(--ink2)}
+h3{font-family:var(--sans);font-weight:500;font-size:18px;margin:0 0 8px;letter-spacing:-.005em}
+p{margin:0 0 16px}
+.muted{color:var(--ink2)}
+.small{font-size:14.5px}
+
+/* Stat strip */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--panel)}
+.stat{padding:30px 26px;border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat .v{font-family:var(--serif);font-size:clamp(40px,4.6vw,58px);line-height:1;letter-spacing:-.02em}
+.stat .u{font-family:var(--mono);font-size:13px;color:var(--ink3);margin-left:4px}
+.stat .l{font-size:14px;color:var(--ink2);margin-top:12px;line-height:1.45}
+.stat .s{font-family:var(--mono);font-size:11px;color:var(--ink3);margin-top:14px}
+.v.sun{color:var(--sun)} .v.night{color:var(--night)} .v.warn{color:var(--warn)}
+
+/* Day/night figure */
+.fig{margin-top:56px;display:grid;grid-template-columns:1.15fr 1fr;gap:40px;align-items:center}
+.fig-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px}
+.fig-card svg{width:100%;height:auto;display:block}
+.cap{font-family:var(--mono);font-size:11.5px;color:var(--ink3);margin-top:12px}
+
+/* What */
+.flow{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-top:12px}
+.step{padding:30px 26px;background:var(--panel);border-right:1px solid var(--line);position:relative}
+.step:last-child{border-right:0}
+.step .n{font-family:var(--mono);font-size:12px;color:var(--sun);margin-bottom:18px;display:block}
+.step ul{margin:10px 0 0;padding:0;list-style:none}
+.step li{font-size:14.5px;color:var(--ink2);padding:6px 0;border-top:1px dashed var(--line)}
+.question{font-family:var(--serif);font-size:clamp(26px,3.2vw,40px);line-height:1.15;border-left:2px solid var(--sun);padding:6px 0 6px 26px;margin:0 0 48px;max-width:30ch}
+.question span{color:var(--night);font-style:italic}
+
+/* Enable */
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px}
+.card .who{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:14px}
+.card p{color:var(--ink2);font-size:15.5px;margin:0}
+
+/* Issues */
+.issues{border-top:1px solid var(--line)}
+.issue{display:grid;grid-template-columns:48px 1fr 150px;gap:22px;padding:28px 0;border-bottom:1px solid var(--line);align-items:start}
+.issue .i{font-family:var(--mono);font-size:13px;color:var(--ink3);padding-top:3px}
+.issue p{color:var(--ink2);font-size:15.5px;margin:6px 0 0;max-width:68ch}
+.tag{justify-self:end;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border-radius:999px;border:1px solid var(--line2);color:var(--ink2);white-space:nowrap}
+.tag.data{color:var(--sun);border-color:color-mix(in srgb,var(--sun) 40%,transparent)}
+.tag.phys{color:var(--night);border-color:color-mix(in srgb,var(--night) 40%,transparent)}
+.tag.policy{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px}
+
+/* Ask */
+.ask{display:grid;grid-template-columns:repeat(2,1fr);gap:0;border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.ask div{padding:26px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);background:var(--panel)}
+.ask div:nth-child(2n){border-right:0}
+.ask div:nth-last-child(-n+2){border-bottom:0}
+.ask .from{font-family:var(--mono);font-size:11px;color:var(--sun);letter-spacing:.08em;text-transform:uppercase}
+.ask h3{margin-top:10px}
+.ask p{font-size:14.5px;color:var(--ink2);margin:0}
+
+/* Roadmap */
+.road{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.phase{border-top:2px solid var(--line2);padding-top:20px}
+.phase.now{border-color:var(--sun)}
+.phase .when{font-family:var(--mono);font-size:12px;color:var(--ink3)}
+.phase.now .when{color:var(--sun)}
+.phase h3{margin-top:8px;font-size:20px}
+.phase p{font-size:15px;color:var(--ink2)}
+
+/* Sources */
+footer{padding:80px 0 100px;border-top:1px solid var(--line)}
+.src{columns:2;column-gap:40px;font-size:13.5px;color:var(--ink2);padding:0;list-style:none;margin:20px 0 0}
+.src li{break-inside:avoid;padding:8px 0;border-bottom:1px solid var(--line)}
+.src a{text-decoration:none;border-bottom:1px solid var(--line2)}
+.src a:hover{color:var(--sun);border-color:var(--sun)}
+.note{margin-top:40px;padding:20px 22px;border:1px dashed var(--line2);border-radius:14px;font-size:14px;color:var(--ink2)}
+
+/* Reveal */
+.r{opacity:0;transform:translateY(18px);transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1)}
+.r.in{opacity:1;transform:none}
+@media (prefers-reduced-motion: reduce){.r{opacity:1;transform:none;transition:none}}
+
+@media (max-width:860px){
+  body{font-size:16px}
+  .wrap{padding:0 20px}
+  section{padding:80px 0}
+  .sec-head{grid-template-columns:1fr;gap:8px;margin-bottom:36px}
+  .sec-num{padding-top:0}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .stat:nth-child(2){border-right:0}
+  .stat:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .fig,.cards,.road{grid-template-columns:1fr}
+  .flow{grid-template-columns:1fr}
+  .step{border-right:0;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:0}
+  .issue{grid-template-columns:36px 1fr}
+  .tag{grid-column:2;justify-self:start}
+  .ask{grid-template-columns:1fr}
+  .ask div{border-right:0!important;border-bottom:1px solid var(--line)!important}
+  .ask div:last-child{border-bottom:0!important}
+  .src{columns:1}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="grid-bg"></div>
+  <div class="wrap" style="position:relative">
+    <div class="kicker r"><b>Headroom MP</b> &nbsp;·&nbsp; Claude × Madhya Pradesh AI Seminar &nbsp;·&nbsp; Concept brief</div>
+    <h1 class="r">Every AI ambition in MP runs on one question: <em>where's the power at 2&nbsp;a.m.?</em></h1>
+    <p class="lede r">Madhya Pradesh wants AI data centres. They need 50–100 MW of power, around the clock, from a grid built around winter irrigation and midday solar. Headroom MP maps where that load can connect, and whether it will stay on after sunset, using the government's own documents.</p>
+    <div class="hero-meta r">
+      <span>Scope <b>Grid siting for AI loads</b></span>
+      <span>Data <b>CTUIL · MPERC · CEA · MP SLDC · OSM</b></span>
+      <span>Status <b>Demo, Sept 2026</b></span>
+    </div>
+  </div>
+</header>
+
+<!-- 01 WHY -->
+<section>
+  <div class="wrap">
+    <div class="sec-head r"><div class="sec-num">01 — Why</div><h2>The ambition is in gigawatts. <em>The plumbing is in PDFs.</em></h2></div>
+
+    <div class="stats r">
+      <div class="stat"><div class="v sun">19,902<span class="u">MW</span></div><div class="l">MP all-time peak demand, January 2026, driven by rabi irrigation</div><div class="s">CEA via CEIC</div></div>
+      <div class="stat"><div class="v night">13,818<span class="u">MW</span></div><div class="l">July 2026 peak. A ~6 GW seasonal swing a flat AI load could fill</div><div class="s">CEA via CEIC</div></div>
+      <div class="stat"><div class="v">1<span class="u">GW</span> <span style="color:var(--ink3)">/</span> 80<span class="u">MW</span></div><div class="l">AI data-centre capacity announced (Submer MoU) vs the one purpose-built site (RackBank, Indore)</div><div class="s">MPSEDC MoU · RackBank</div></div>
+      <div class="stat"><div class="v warn">0</div><div class="l">MP substations on CTUIL's list of ISTS nodes offered to bulk consumers</div><div class="s">CTUIL, list as on 31-08-2025</div></div>
+    </div>
+
+    <div class="fig r">
+      <div class="fig-card">
+        <svg viewBox="0 0 520 250" role="img" aria-label="Day versus night supply for a flat 24x7 load">
+          <defs>
+            <linearGradient id="sunG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--sun)" stop-opacity=".55"/><stop offset="1" stop-color="var(--sun)" stop-opacity="0"/></linearGradient>
+          </defs>
+          <rect x="0" y="0" width="130" height="210" fill="var(--night-dim)"/>
+          <rect x="390" y="0" width="130" height="210" fill="var(--night-dim)"/>
+          <path d="M130 210 C 190 210, 210 40, 260 40 C 310 40, 330 210, 390 210 Z" fill="url(#sunG)" stroke="var(--sun)" stroke-width="1.5"/>
+          <line x1="0" y1="140" x2="520" y2="140" stroke="var(--ink)" stroke-width="2" stroke-dasharray="6 5"/>
+          <text x="8" y="132" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-size="11">AI data centre · flat 24×7 load</text>
+          <text x="260" y="30" text-anchor="middle" fill="var(--sun)" font-family="IBM Plex Mono, monospace" font-size="11">solar hours</text>
+          <text x="65" y="30" text-anchor="middle" fill="var(--night)" font-family="IBM Plex Mono, monospace" font-size="11">non-solar</text>
+          <text x="455" y="30" text-anchor="middle" fill="var(--night)" font-family="IBM Plex Mono, monospace" font-size="11">non-solar</text>
+          <line x1="0" y1="210" x2="520" y2="210" stroke="var(--line2)"/>
+          <g fill="var(--ink3)" font-family="IBM Plex Mono, monospace" font-size="10">
+            <text x="0" y="232">00:00</text><text x="120" y="232">06:00</text><text x="248" y="232">12:00</text><text x="378" y="232">18:00</text><text x="486" y="232">24:00</text>
+          </g>
+        </svg>
+        <div class="cap">Illustrative shape, not data. The night band is where the siting decision is actually made.</div>
+      </div>
+      <div>
+        <h3>The honest problem</h3>
+        <p class="muted">MP is pushing solar hard, with a stated goal of meeting half its power needs from solar by 2030. But solar produces nothing at night, and a GPU cluster does not sleep. Night supply today comes from roughly 15 GW of thermal plants, while the first large battery tenders (625 MW / 1,250 MWh at Bina, Sendhwa and Birsinghpur) only closed bids in July 2026.</p>
+        <p class="muted">Meanwhile, an investor asking "can I put 100 MW near Bhopal?" has to read transmission PDFs, regulator orders and tender notices by hand. No single view answers it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 02 WHAT -->
+<section>
+  <div class="wrap">
+    <div class="sec-head r"><div class="sec-num">02 — What</div><h2>One question, answered with <em>citations, not opinions.</em></h2></div>
+    <p class="question r">"Where in Madhya Pradesh can a 50–100 MW AI data centre connect, <span>and will it have power at night?</span>"</p>
+    <div class="flow r">
+      <div class="step"><span class="n">01 · Ingest</span><h3>Collect the public record</h3><p class="muted small">Scheduled fetch of the documents the grid already publishes.</p>
+        <ul><li>CTUIL substation margins, solar & non-solar hour access</li><li>CTUIL bulk-consumer & GNA grant lists</li><li>MPERC status reports, MPPTCL capacity</li><li>MP SLDC load, OSM substation geometry</li></ul></div>
+      <div class="step"><span class="n">02 · Extract</span><h3>Claude reads the PDFs</h3><p class="muted small">Messy multi-row tables become structured records.</p>
+        <ul><li>Every field carries document URL + page + date</li><li>Schema validation, rejects incomplete rows</li><li>Cross-checked against MPERC totals</li><li>Low-confidence geocodes go to human review</li></ul></div>
+      <div class="step"><span class="n">03 · Answer</span><h3>Map + scenario agent</h3><p class="muted small">A viewer that ranks substations for a requested load.</p>
+        <ul><li>Day vs night headroom colouring</li><li>"100 MW near Bhopal, 24×7" → ranked shortlist</li><li>Constraints and planned upgrades per node</li><li>Source drawer on every number</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 ENABLE -->
+<section>
+  <div class="wrap">
+    <div class="sec-head r"><div class="sec-num">03 — For MP</div><h2>What this could unlock <em>for the state.</em></h2></div>
+    <div class="cards">
+      <div class="card r"><div class="who">MPSEDC · Invest MP</div><h3>Answer investors in minutes, not months</h3><p>Turn the 1 GW Submer MoU and future data-centre enquiries into sited, evidence-backed proposals. The first question every hyperscaler asks gets a cited answer on day one.</p></div>
+      <div class="card r"><div class="who">MPPTCL · MPPMCL</div><h3>See where demand wants to land</h3><p>Scenario queries become a demand signal: where investors keep asking, where night headroom runs out. That informs where the next BESS unit or transformer augmentation earns its keep.</p></div>
+      <div class="card r"><div class="who">State AI Mission</div><h3>Make "green data centres" measurable</h3><p>The Mission's 2026-27 foundation phase calls for infrastructure readiness. A shared, cited map of grid capacity is exactly that kind of foundation, and a live AI-for-governance use case in itself.</p></div>
+      <div class="card r"><div class="who">Policy & regulators</div><h3>Evidence for incentives</h3><p>Data-centre incentives (anchor capital support, tariff reimbursement, duty exemptions) work best when the grid can deliver. The map shows where policy and physics already agree, and where they don't.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 ISSUES -->
+<section>
+  <div class="wrap">
+    <div class="sec-head r"><div class="sec-num">04 — Out of frame</div><h2>The real problems <em>the demo doesn't solve.</em></h2></div>
+    <p class="muted r" style="max-width:66ch;margin-bottom:34px">A demo that hides these would be a nicer slide and a worse product. These are the constraints anyone building AI infrastructure in MP will hit.</p>
+    <div class="legend r"><span class="tag data">Data gap</span><span class="tag phys">Physical constraint</span><span class="tag policy">Process / policy</span></div>
+    <div class="issues">
+      <div class="issue r"><div class="i">01</div><div><h3>No load-side ISTS node exists in MP</h3><p>CTUIL's monthly list of inter-state substations for bulk consumers covers Odisha, Gujarat, Tamil Nadu and Andhra Pradesh. Madhya Pradesh has none, so a 50–100 MW data centre realistically connects through the state network at 220/400 kV.</p></div><span class="tag phys">Physical</span></div>
+      <div class="issue r"><div class="i">02</div><div><h3>Intra-state margins aren't machine-readable</h3><p>MPPTCL's list of EHV substations with available margin (MVA) is an undated PDF behind robots.txt and third-party mirrors. The single most useful dataset for this question can't be ingested automatically today.</p></div><span class="tag data">Data gap</span></div>
+      <div class="issue r"><div class="i">03</div><div><h3>Published margins describe generation, not load</h3><p>CTUIL's solar/non-solar margins tell you how much renewable power a substation can export. They are a useful proxy, but not the same as how much a data centre can safely draw.</p></div><span class="tag data">Data gap</span></div>
+      <div class="issue r"><div class="i">04</div><div><h3>Nobody publishes night load per substation</h3><p>Night headroom has to be modelled from transformation capacity and state-level load curves. Without substation-level coincident load, every night figure is an estimate.</p></div><span class="tag data">Data gap</span></div>
+      <div class="issue r"><div class="i">05</div><div><h3>Night power is still thermal</h3><p>Storage is coming but not here: MPPMCL's 625 MW / 1,250 MWh BESS bids were due July 2026, and Morena's solar-plus-storage is scheduled for December 2027. Until then, 24×7 AI load leans on coal.</p></div><span class="tag phys">Physical</span></div>
+      <div class="issue r"><div class="i">06</div><div><h3>Transmission arrives on a multi-year clock</h3><p>The Kurawar 765 kV substation is expected around June 2027; parts of the Gadarwara-II / Mandsaur augmentation run to March 2031. Data centres are built in 18 months.</p></div><span class="tag phys">Physical</span></div>
+      <div class="issue r"><div class="i">07</div><div><h3>Connection rules add friction</h3><p>Bulk consumers of 50 MW+ can apply to CTU for ISTS connectivity, but the GNA regulations don't allow dual (part inter-state, part intra-state) connectivity, and each route has its own fees and approvals.</p></div><span class="tag policy">Policy</span></div>
+      <div class="issue r"><div class="i">08</div><div><h3>Power is only one of the inputs</h3><p>Cooling water, fibre routes, land and skilled staff all decide real sites. None of them are in this demo.</p></div><span class="tag phys">Physical</span></div>
+      <div class="issue r"><div class="i">09</div><div><h3>The citizen side stays invisible</h3><p>Feeder-level reliability for homes and farms sits in the National Feeder Monitoring System, which isn't public. A grid tool for investors shouldn't be the only grid tool that exists.</p></div><span class="tag data">Data gap</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 ASK -->
+<section>
+  <div class="wrap">
+    <div class="sec-head r"><div class="sec-num">05 — The ask</div><h2>Four datasets turn a demo <em>into a tool.</em></h2></div>
+    <div class="ask r">
+      <div><span class="from">MPPTCL / STU</span><h3>Substation margins as CSV or API</h3><p>Dated, per-substation available MVA and bay availability, published on a fixed cadence.</p></div>
+      <div><span class="from">MP SLDC</span><h3>Substation-level load profiles</h3><p>Hourly or 15-minute loading for 220 kV and above, even anonymised or lagged by a quarter.</p></div>
+      <div><span class="from">MPPMCL</span><h3>Storage & RTC pipeline status</h3><p>BESS and round-the-clock procurement milestones by node, so night headroom can be projected.</p></div>
+      <div><span class="from">MPSEDC</span><h3>A pilot partner</h3><p>One real investor enquiry run through the tool end to end, with feedback from the people who answer those enquiries today.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 06 ROADMAP -->
+<section>
+  <div class="wrap">
+    <div class="sec-head r"><div class="sec-num">06 — Path</div><h2>From seminar demo <em>to state infrastructure.</em></h2></div>
+    <div class="road">
+      <div class="phase now r"><div class="when">Now · Demo</div><h3>Public-data map</h3><p>~20 MP substations, verified capacities, clearly-labelled mock headroom, scenario agent with citations.</p></div>
+      <div class="phase r"><div class="when">Next · Pilot</div><h3>With state data</h3><p>MPPTCL margins and SLDC loading ingested; night headroom modelled; one MPSEDC enquiry run live.</p></div>
+      <div class="phase r"><div class="when">Later · Platform</div><h3>Live and extensible</h3><p>Monthly auto-refresh, BESS and transmission milestones tracked, and the same pipeline pointed at feeder reliability for citizens.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="kicker">Sources</div>
+    <ul class="src">
+      <li><a href="https://www.ceicdata.com/en/india/electricity-demand-and-supply/power-peak-demand-western-madhya-pradesh" target="_blank" rel="noopener">CEIC / CEA — MP peak demand series</a></li>
+      <li><a href="https://ctuil.in/substation-bulk-consumers" target="_blank" rel="noopener">CTUIL — ISTS substations for bulk consumers</a></li>
+      <li><a href="https://ctuil.in/renewable-energy" target="_blank" rel="noopener">CTUIL — bay allocation, margins, solar/non-solar access</a></li>
+      <li><a href="https://sldcmpindia.in/" target="_blank" rel="noopener">MP SLDC, Jabalpur</a></li>
+      <li><a href="https://www.tndindia.com/mpptcls-transformation-capacity-crosses-85-gva-mark/" target="_blank" rel="noopener">T&amp;D India — MPPTCL transformation capacity</a></li>
+      <li><a href="https://www.indigrid.co.in/portfolio-assets/bhopal-dhule-transmission-company-limited-bdtcl" target="_blank" rel="noopener">IndiGrid — Bhopal (BDTCL) 765/400 kV</a></li>
+      <li><a href="https://www.datacenterdynamics.com/en/news/rackbank-announces-80mw-madya-pradesh-data-center-in-india/" target="_blank" rel="noopener">DCD — RackBank 80 MW, Indore</a></li>
+      <li><a href="https://w.media/madhya-pradesh-plans-to-build-1gw-ai-ready-data-center/" target="_blank" rel="noopener">W.Media — MP 1 GW AI-ready data centre MoU</a></li>
+      <li><a href="https://ddnews.gov.in/en/madhya-pradesh-govt-to-roll-out-ai-mission-in-phases-to-boost-governance/" target="_blank" rel="noopener">DD News — MP State AI Mission phases</a></li>
+      <li><a href="https://www.eqmagpro.com/madhya-pradesh-to-expand-green-energy-capacity-to-15000-mw-by-2026-eq/" target="_blank" rel="noopener">EQ — MP solar goal, Morena storage</a></li>
+    </ul>
+    <div class="note">Figures on this page are from the cited public sources. BESS, transmission and incentive details come from trade press and regulator documents compiled in the research dossier and should be re-verified against primary orders before any formal submission.</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var els=document.querySelectorAll('.r');
+  if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')});return;}
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}})},{threshold:.12,rootMargin:'0px 0px -40px 0px'});
+  els.forEach(function(e,i){e.style.transitionDelay=(Math.min(i%4,3)*70)+'ms';io.observe(e)});
+})();
+</script>
+</body>
+</html>

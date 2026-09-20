@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Headroom MP — Grid siting for AI data centres (demo)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0b0d; --bg2:#0f1115; --panel:#13161b; --panel2:#181b21; --line:#23272f; --line2:#2f343e;
+  --ink:#eceae4; --ink2:#a6a5a0; --ink3:#6b6b68;
+  --sun:#f2a541; --night:#8b9cff; --good:#5fd4a0; --mid:#f2c14e; --bad:#ff7a6b;
+  --map-fill:#12151a; --map-stroke:#3a404b;
+  --serif:"Instrument Serif", Georgia, serif;
+  --sans:"IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --accent:var(--night);
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#f3f1ec; --bg2:#ebe8e1; --panel:#ffffff; --panel2:#f7f5f0; --line:#dedad1; --line2:#cdc8bd;
+    --ink:#16171a; --ink2:#55565a; --ink3:#8b8a86; --sun:#c77a12; --night:#4b5bd6;
+    --good:#1f9d6b; --mid:#c28a00; --bad:#d4483a; --map-fill:#ffffff; --map-stroke:#b9b3a6;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a0b0d; --bg2:#0f1115; --panel:#13161b; --panel2:#181b21; --line:#23272f; --line2:#2f343e;
+  --ink:#eceae4; --ink2:#a6a5a0; --ink3:#6b6b68; --sun:#f2a541; --night:#8b9cff;
+  --good:#5fd4a0; --mid:#f2c14e; --bad:#ff7a6b; --map-fill:#12151a; --map-stroke:#3a404b;
+}
+body.day{--accent:var(--sun)}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;font-weight:400;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;min-height:100%}
+button,input,select{font:inherit;color:inherit}
+.mono{font-family:var(--mono)}
+
+/* Top bar */
+.top{display:flex;align-items:center;gap:18px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:env(safe-area-inset-top,0px);z-index:20}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand b{font-family:var(--serif);font-weight:400;font-size:24px;letter-spacing:-.01em}
+.brand span{font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px;margin-left:auto}
+.seg button{border:0;background:transparent;padding:7px 14px;border-radius:999px;cursor:pointer;color:var(--ink2);font-size:13px;display:flex;align-items:center;gap:7px}
+.seg button.on{background:var(--panel2);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line2)}
+.seg .dot{width:8px;height:8px;border-radius:50%}
+.badge{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:5px 9px;border-radius:999px;border:1px dashed var(--line2);color:var(--ink3);white-space:nowrap}
+
+/* Layout */
+.app{flex:1;display:grid;grid-template-columns:330px 1fr 360px;min-height:0}
+aside{border-right:1px solid var(--line);overflow:auto;background:var(--bg)}
+.right{border-right:0;border-left:1px solid var(--line)}
+.pad{padding:18px 18px 22px}
+.lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin:0 0 10px}
+.block{border-bottom:1px solid var(--line)}
+
+/* Scenario */
+.ask{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.ask .q{font-family:var(--serif);font-size:21px;line-height:1.2;margin-bottom:14px}
+.ask .q em{color:var(--accent)}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.row > label:not(.sw){font-size:12px;color:var(--ink2);width:58px;flex:none}
+.row input[type=number],.row select{flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-width:0}
+.sw{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);cursor:pointer;user-select:none}
+.sw input{display:none}
+.sw i{width:30px;height:18px;border-radius:999px;background:var(--line2);position:relative;transition:.2s}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--ink);transition:.2s}
+.sw input:checked+i{background:var(--night)}
+.sw input:checked+i::after{left:14px;background:#0a0b0d}
+.go{width:100%;margin-top:6px;border:0;border-radius:10px;padding:10px;background:var(--ink);color:var(--bg);font-weight:500;cursor:pointer;display:flex;justify-content:center;gap:8px;align-items:center}
+.go:hover{opacity:.9}
+.answer{margin-top:14px;font-size:13.5px;line-height:1.55;color:var(--ink2);min-height:0}
+.answer b{color:var(--ink);font-weight:500}
+.cite{display:inline-block;font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:5px;border:1px solid var(--line2);color:var(--ink3);margin-left:2px;vertical-align:1px;cursor:pointer}
+.cite:hover{color:var(--accent);border-color:var(--accent)}
+.caret{display:inline-block;width:7px;height:14px;background:var(--accent);vertical-align:-2px;animation:blink 1s steps(2) infinite;margin-left:2px}
+@keyframes blink{50%{opacity:0}}
+.results{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.res{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--bg2)}
+.res:hover,.res.sel{border-color:var(--accent)}
+.res .n{font-family:var(--mono);font-size:11px;color:var(--accent)}
+.res .nm{font-size:13px}
+.res .sub{font-size:11px;color:var(--ink3);font-family:var(--mono)}
+.res .hm{font-family:var(--mono);font-size:11.5px;text-align:right}
+
+/* Filters */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 11px;font-size:12px;cursor:pointer;color:var(--ink2)}
+.chip.on{border-color:var(--ink2);color:var(--ink);background:var(--panel2)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.rangeval{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--ink3)}
+
+/* Map */
+.mapwrap{position:relative;min-height:0;display:flex;flex-direction:column;background:
+  radial-gradient(800px 500px at 50% 45%, color-mix(in srgb,var(--accent) 7%,transparent), transparent 70%), var(--bg2)}
+.map{flex:1;min-height:0;position:relative}
+.map svg{position:absolute;inset:0;width:100%;height:100%}
+.mp{fill:var(--map-fill);stroke:var(--map-stroke);stroke-width:1.3}
+.grid line{stroke:var(--line);stroke-width:.6}
+.city text{font-family:var(--mono);font-size:11px;fill:var(--ink3)}
+.city circle{fill:var(--ink3)}
+.node{cursor:pointer;transition:opacity .25s}
+.node .halo{opacity:.16;transition:r .3s}
+.node:hover .core{stroke:var(--ink);stroke-width:2}
+.node.dim{opacity:.18}
+.node.sel .core{stroke:var(--ink);stroke-width:2.5}
+.node .rank{font-family:var(--mono);font-size:11px;font-weight:500;fill:var(--bg)}
+.planned{fill:none;stroke-dasharray:3 3;stroke-width:1.3}
+.bess{font-family:var(--mono);font-size:9px}
+.searchring{fill:color-mix(in srgb,var(--accent) 7%,transparent);stroke:var(--accent);stroke-dasharray:5 5;stroke-width:1.2}
+.maplegend{position:absolute;left:16px;bottom:204px;background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:11.5px;color:var(--ink2);display:flex;flex-direction:column;gap:6px}
+.maplegend div{display:flex;align-items:center;gap:8px}
+.maplegend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:8px 10px;font-size:12px;opacity:0;transition:opacity .15s;white-space:nowrap;z-index:5}
+.tip .mono{color:var(--ink3);font-size:11px}
+.mapnote{position:absolute;right:16px;top:14px;font-family:var(--mono);font-size:10.5px;color:var(--ink3);text-align:right;line-height:1.5}
+
+/* Bottom */
+.bottom{border-top:1px solid var(--line);background:var(--bg);height:190px;display:flex;flex-direction:column}
+.tabs{display:flex;gap:2px;padding:8px 14px 0;border-bottom:1px solid var(--line)}
+.tab{border:0;background:none;padding:8px 12px;cursor:pointer;color:var(--ink3);font-size:12.5px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:var(--ink);border-color:var(--accent)}
+.pane{flex:1;overflow:auto;padding:14px 18px;display:none}
+.pane.on{display:block}
+.bars{display:flex;align-items:flex-end;gap:26px;height:100px;padding-left:4px}
+.bar{display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--ink2)}
+.bar div{width:54px;border-radius:6px 6px 2px 2px}
+.demand{display:flex;gap:36px;align-items:flex-end}
+.demand p{max-width:52ch;color:var(--ink2);font-size:13px;margin:0;line-height:1.55}
+.gaps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.gap{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel);font-size:12.5px;color:var(--ink2)}
+.gap b{display:block;color:var(--ink);font-weight:500;margin-bottom:4px;font-size:13px}
+.gap span{font-family:var(--mono);font-size:10px;color:var(--sun);text-transform:uppercase;letter-spacing:.08em}
+.srclist{columns:2;font-size:12.5px;color:var(--ink2);margin:0;padding-left:18px}
+.srclist li{margin-bottom:6px;break-inside:avoid}
+.srclist a{color:inherit}
+
+/* Detail */
+.empty{color:var(--ink3);font-size:13px;line-height:1.6;padding:28px 18px}
+.empty .big{font-family:var(--serif);font-size:26px;color:var(--ink2);line-height:1.15;margin-bottom:10px}
+.dh{padding:18px;border-bottom:1px solid var(--line)}
+.dh .own{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+.dh h2{font-family:var(--serif);font-weight:400;font-size:28px;line-height:1.08;margin:6px 0 10px;letter-spacing:-.01em}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.kv div{background:var(--bg);padding:12px 18px}
+.kv .k{font-family:var(--mono);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em}
+.kv .v{font-size:15px;margin-top:3px}
+.flag{font-family:var(--mono);font-size:9.5px;padding:2px 6px;border-radius:5px;margin-left:6px;vertical-align:2px;letter-spacing:.04em;text-transform:uppercase}
+.flag.ver{color:var(--good);border:1px solid color-mix(in srgb,var(--good) 45%,transparent)}
+.flag.est{color:var(--mid);border:1px solid color-mix(in srgb,var(--mid) 45%,transparent)}
+.hbar{margin:4px 0 16px}
+.hbar .t{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px;color:var(--ink2)}
+.hbar .t b{font-family:var(--mono);color:var(--ink);font-weight:500}
+.hbar .track{height:8px;background:var(--panel2);border-radius:999px;overflow:hidden;position:relative}
+.hbar .fill{height:100%;border-radius:999px;transition:width .5s cubic-bezier(.2,.7,.2,1)}
+.hbar .req{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.note{font-size:13px;color:var(--ink2);line-height:1.55;margin:0 0 14px}
+.srcs{display:flex;flex-direction:column;gap:6px}
+.src{display:flex;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;font-size:12px;color:var(--ink2);text-decoration:none;background:var(--panel)}
+.src:hover{border-color:var(--accent)}
+.src .i{font-family:var(--mono);color:var(--accent);font-size:11px}
+.claude{margin-top:16px;padding:12px;border-radius:12px;border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--bg));font-size:12.5px;color:var(--ink2);line-height:1.55}
+.claude .who{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+
+@media (max-width:1100px){
+  .app{grid-template-columns:300px 1fr}
+  .right{grid-column:1 / -1;border-left:0;border-top:1px solid var(--line)}
+  .gaps{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:760px){
+  .top{flex-wrap:wrap;gap:10px;padding:10px 14px}
+  .seg{margin-left:0;order:3;width:100%;justify-content:center}
+  .badge{margin-left:auto}
+  html,body{height:auto}
+  .app{grid-template-columns:1fr;display:flex;flex-direction:column;flex:none}
+  .app > *{flex-shrink:0}
+  .mapwrap{order:-1;min-height:62vh}
+  aside{border-right:0;border-bottom:1px solid var(--line);overflow:visible}
+  .bottom{height:auto}
+  .pane{max-height:none}
+  .demand{flex-direction:column;align-items:flex-start;gap:14px}
+  .gaps,.srclist{grid-template-columns:1fr;columns:1}
+  .map{min-height:300px;flex:none;height:300px}
+  .mapnote{display:none}
+  .maplegend{position:static;flex-direction:row;flex-wrap:wrap;gap:6px 12px;font-size:10.5px;margin:0 12px 12px;border-radius:10px}
+  .mapwrap{min-height:0}
+}
+</style>
+</head>
+<body class="night">
+
+<div class="top">
+  <div class="brand"><b>Headroom</b><span>Madhya Pradesh · AI load siting</span></div>
+  <div class="seg" role="tablist" aria-label="Headroom period">
+    <button id="bDay"><span class="dot" style="background:var(--sun)"></span>Solar hours</button>
+    <button id="bNight" class="on"><span class="dot" style="background:var(--night)"></span>Non-solar hours</button>
+  </div>
+  <span class="badge">Demo · headroom values are mock</span>
+</div>
+
+<div class="app">
+  <aside>
+    <div class="pad block">
+      <p class="lbl">Scenario</p>
+      <div class="ask">
+        <div class="q">Where can <em id="qMw">100 MW</em> connect near <em id="qCity">Bhopal</em><span id="qRtc">, 24×7</span>?</div>
+        <div class="row"><label>Load</label><input id="mw" type="number" min="10" max="500" step="10" value="100"><span class="mono" style="color:var(--ink3);font-size:12px">MW</span></div>
+        <div class="row"><label>Near</label><select id="city"></select></div>
+        <div class="row"><label>Radius</label><select id="rad"><option value="150">150 km</option><option value="250" selected>250 km</option><option value="400">400 km</option></select></div>
+        <div class="row" style="justify-content:space-between"><label class="sw"><input id="rtc" type="checkbox" checked><i></i>Needs power at night (24×7)</label></div>
+        <button class="go" id="run">Ask Headroom <span class="mono" style="font-size:11px;opacity:.6">↵</span></button>
+        <div class="answer" id="answer"></div>
+        <div class="results" id="results"></div>
+      </div>
+    </div>
+    <div class="pad block">
+      <p class="lbl">Voltage</p>
+      <div class="chips" id="fVolt"></div>
+      <p class="lbl">Owner</p>
+      <div class="chips" id="fOwn"></div>
+      <p class="lbl">Minimum headroom</p>
+      <input type="range" id="minH" min="0" max="300" step="10" value="0">
+      <div class="rangeval"><span>0 MW</span><span id="minHv">show all</span><span>300 MW</span></div>
+    </div>
+    <div class="pad">
+      <p class="lbl">Layers</p>
+      <label class="sw" style="margin-bottom:10px"><input id="lPlan" type="checkbox" checked><i></i>Planned upgrades & BESS</label>
+      <label class="sw"><input id="lCity" type="checkbox" checked><i></i>City labels</label>
+    </div>
+  </aside>
+
+  <main class="mapwrap">
+    <div class="map" id="map">
+      <svg id="svg" viewBox="0 0 1000 735" preserveAspectRatio="xMidYMid meet" aria-label="Map of Madhya Pradesh substations">
+        <g class="grid" id="grid"></g>
+        <path class="mp" d="M494,18L496,23L500,23L503,27L516,32L532,26L533,29L535,27L538,31L543,31L549,38L558,39L557,43L563,40L564,49L561,54L570,62L569,68L578,69L577,73L573,73L572,79L578,81L573,90L571,88L568,91L570,95L566,95L565,99L561,99L564,104L557,106L564,113L558,118L556,129L550,133L551,139L547,140L548,147L543,143L542,146L544,147L536,153L543,162L542,168L528,172L525,175L521,173L518,176L507,173L504,177L501,176L498,179L500,186L495,190L492,189L486,198L490,203L487,206L491,208L493,214L497,217L496,220L503,223L500,225L502,228L497,228L490,233L490,244L472,258L471,261L476,266L483,284L482,297L478,301L483,307L483,310L493,318L489,325L496,331L501,328L509,317L517,321L527,335L536,335L537,333L541,343L543,339L550,337L554,328L560,322L562,311L554,308L554,304L556,306L560,304L551,287L539,293L536,291L535,285L539,279L539,266L538,260L527,255L522,248L524,236L519,232L516,212L508,208L503,211L501,209L505,208L508,205L511,207L513,204L511,200L517,201L515,196L523,195L525,190L531,192L527,195L526,193L526,197L532,198L532,201L538,200L535,194L543,192L537,191L533,188L534,183L545,187L547,189L543,190L545,191L548,187L545,182L550,180L551,176L557,177L554,181L557,186L553,190L559,191L561,198L556,201L552,198L558,195L550,197L546,204L540,207L543,207L542,211L546,216L550,202L559,202L560,209L550,213L550,224L558,217L563,220L563,215L560,214L564,210L565,214L570,216L566,226L568,227L573,220L577,224L577,230L583,229L582,226L584,225L586,230L590,230L591,227L587,226L591,224L594,229L598,225L594,220L594,214L600,219L602,218L600,216L601,211L592,210L592,206L597,203L602,203L600,208L603,212L604,208L609,212L614,209L618,211L614,211L611,216L612,218L609,218L606,223L608,230L609,227L611,231L615,227L614,232L618,234L626,222L630,225L630,228L646,226L657,232L657,228L660,226L657,215L663,213L664,215L668,211L674,211L676,202L683,201L688,203L695,197L695,193L701,195L702,192L708,197L707,209L718,214L721,223L713,226L705,236L703,240L709,243L713,240L717,242L714,237L719,234L723,234L728,238L729,233L726,231L734,235L736,233L741,235L739,225L744,229L740,231L749,234L748,237L759,236L759,233L754,232L751,227L762,226L765,230L766,220L771,220L774,224L769,229L770,235L765,239L767,244L761,247L762,250L773,251L777,247L779,253L786,252L785,249L793,249L799,257L802,249L804,252L808,252L806,244L813,235L811,231L814,223L818,224L819,230L821,223L827,229L832,228L832,230L828,231L837,235L840,231L836,227L842,226L840,221L847,220L852,224L849,227L850,232L852,229L854,231L850,234L851,236L857,234L859,238L865,238L871,242L876,241L882,244L883,242L883,257L890,264L895,262L907,269L912,269L916,265L914,267L918,270L915,270L913,275L918,276L916,274L921,273L921,271L920,283L923,281L927,283L927,290L940,292L939,282L941,279L944,283L952,282L953,286L967,280L971,283L971,287L979,286L978,292L982,292L983,298L973,297L976,304L972,318L978,319L979,329L975,337L974,348L968,345L967,348L973,355L979,355L976,362L982,364L983,369L977,374L967,375L967,380L964,384L953,386L954,389L949,390L945,387L919,388L917,382L912,386L899,386L894,381L889,382L885,380L874,387L863,384L857,373L850,378L855,392L860,398L855,405L852,405L851,413L847,414L848,418L851,419L851,424L853,426L856,421L861,422L865,417L873,419L875,423L885,421L892,435L896,434L896,438L899,439L905,437L907,442L910,441L915,446L915,451L910,458L911,468L907,472L902,471L897,475L888,476L885,480L888,490L879,495L879,498L869,500L871,513L866,518L868,526L866,527L864,524L857,529L856,537L852,541L841,541L828,552L826,545L820,542L818,548L815,545L808,551L804,547L796,552L797,570L793,576L786,578L786,590L781,591L785,597L782,600L779,592L774,592L767,610L764,611L767,623L763,636L756,635L753,640L752,656L754,669L747,686L739,687L727,678L718,681L717,677L719,673L715,663L702,651L695,650L674,662L670,659L666,660L665,663L658,662L644,654L635,659L623,661L618,645L602,644L589,639L588,648L580,647L573,654L563,652L554,655L556,659L553,659L557,664L556,668L540,667L539,670L536,667L533,670L518,668L516,664L509,663L501,666L500,654L495,652L493,657L491,655L487,657L483,655L483,657L473,659L472,666L447,680L440,681L431,677L424,682L421,683L419,678L417,682L415,679L410,679L410,682L408,682L397,681L395,671L392,669L389,662L394,659L406,662L410,661L406,658L403,642L396,633L375,634L374,639L368,640L366,643L362,639L351,639L332,654L327,652L325,655L321,654L320,661L317,663L320,667L319,670L302,686L306,692L302,703L287,702L283,712L274,717L264,717L262,715L252,716L248,711L246,706L251,706L252,704L244,681L239,684L229,679L221,678L197,680L190,679L183,681L147,677L135,671L129,658L112,650L99,653L74,644L73,640L69,639L71,617L62,609L62,602L55,603L52,608L46,610L44,613L35,615L29,611L29,607L24,605L32,595L27,594L26,580L21,579L23,576L19,571L20,562L25,561L27,566L34,567L35,561L37,562L41,557L45,558L40,553L35,553L33,548L33,552L30,554L28,551L26,555L24,549L21,549L22,544L17,546L17,540L21,539L29,543L42,528L54,529L57,517L65,502L62,494L57,497L52,493L50,489L53,487L48,477L56,471L69,474L73,469L79,468L86,461L95,459L95,457L89,458L92,456L90,452L84,454L75,449L73,451L70,445L80,429L93,425L99,419L101,421L106,418L112,410L116,409L113,403L116,396L112,380L114,372L122,361L110,339L112,336L111,333L108,330L95,330L107,308L103,309L103,305L91,303L96,297L95,292L100,291L99,287L103,283L98,281L101,268L111,285L116,285L119,280L123,279L122,273L125,273L125,271L123,268L114,269L109,266L106,269L104,248L107,247L108,251L112,251L117,258L127,261L129,258L136,257L135,248L141,245L140,238L161,238L161,241L158,243L160,248L157,256L153,246L155,253L152,257L157,259L169,257L169,260L156,266L153,261L148,261L150,256L146,254L145,258L150,263L143,272L147,277L152,276L173,281L187,277L190,281L206,272L215,276L214,283L216,285L214,290L224,295L225,300L221,303L223,309L216,314L210,307L206,315L203,315L204,322L207,327L212,328L214,335L208,338L205,347L212,352L215,351L215,355L209,357L207,365L200,368L196,360L193,364L187,365L179,358L174,367L173,374L184,381L186,383L184,385L187,388L195,388L198,393L198,386L202,386L203,381L200,379L200,376L208,382L230,372L229,361L248,353L246,341L250,335L249,330L253,324L257,338L264,338L269,334L279,339L285,336L292,345L297,343L295,340L299,337L298,334L301,335L301,333L309,330L310,334L307,341L310,344L316,344L321,350L332,348L334,342L337,339L329,332L326,323L327,308L323,300L328,298L330,301L334,299L334,305L339,309L349,301L350,296L346,279L340,276L338,272L326,274L321,265L338,259L334,257L334,254L331,253L327,242L342,234L356,235L362,230L372,229L377,234L387,230L386,221L389,220L382,211L384,205L380,204L383,194L377,191L374,193L367,199L366,206L352,203L337,210L331,205L318,206L317,203L308,202L299,197L295,190L290,180L289,162L286,160L286,157L291,155L291,147L298,138L302,139L304,134L315,134L316,130L322,129L324,119L331,112L342,107L347,101L353,100L357,94L366,94L375,87L380,80L391,79L390,74L401,73L417,62L422,62L425,57L433,56L434,51L440,48L442,43L448,43L453,38L463,41L463,34L466,32L464,30L465,26L473,27L472,23L482,24L485,19L494,18Z"/>
+        <g id="ring"></g>
+        <g class="city" id="cities"></g>
+        <g id="nodes"></g>
+      </svg>
+      <div class="tip" id="tip"></div>
+      <div class="mapnote">Geometry: GADM-derived MP outline<br>Substation positions approximate</div>
+    </div>
+    <div class="maplegend">
+      <div><i style="background:var(--good)"></i>Headroom ≥ requested load</div>
+      <div><i style="background:var(--mid)"></i>≥ half the load</div>
+      <div><i style="background:var(--bad)"></i>Below half</div>
+      <div><i style="border:1.3px dashed var(--ink2);background:none"></i>Planned upgrade · <span class="mono" style="color:var(--night)">B</span> BESS node</div>
+    </div>
+    <div class="bottom">
+      <div class="tabs">
+        <button class="tab on" data-p="pDemand">Demand context</button>
+        <button class="tab" data-p="pGaps">Data we need</button>
+        <button class="tab" data-p="pSrc">Sources</button>
+      </div>
+      <div class="pane on" id="pDemand">
+        <div class="demand">
+          <div class="bars" id="dbars"></div>
+          <p>MP's all-time peak came in <b style="color:var(--ink)">January 2026 at 19,902 MW</b>, driven by rabi irrigation. By July 2026 peak demand was 13,818 MW. A flat 24×7 data-centre load is easiest to absorb in the monsoon trough and hardest on winter nights, which is why this map defaults to <span style="color:var(--night)">non-solar hours</span>.</p>
+        </div>
+      </div>
+      <div class="pane" id="pGaps">
+        <div class="gaps">
+          <div class="gap"><span>MPPTCL</span><b>Margins as CSV/API</b>Per-substation available MVA, dated. Today: undated PDF, not crawlable.</div>
+          <div class="gap"><span>MP SLDC</span><b>Substation load profiles</b>15-min loading at 220 kV+, to replace modelled night headroom.</div>
+          <div class="gap"><span>CTUIL</span><b>An MP bulk-consumer node</b>No MP substation on the load-side ISTS list as of Aug 2025.</div>
+          <div class="gap"><span>MPPMCL</span><b>BESS milestones by node</b>Bina, Sendhwa, Birsinghpur: award and COD dates.</div>
+        </div>
+      </div>
+      <div class="pane" id="pSrc">
+        <ul class="srclist" id="srclist"></ul>
+      </div>
+    </div>
+  </main>
+
+  <aside class="right" id="detail"></aside>
+</div>
+
+<script>
+/* ---------- Projection (matches the simplified MP outline) ---------- */
+var P={lon0:73.887086,lat1:27.018841,sx:120.67837814186875,k:0.9135454576426009};
+function xy(lat,lng){return [(lng-P.lon0)*P.k*P.sx,(P.lat1-lat)*P.sx];}
+
+/* ---------- Sources ---------- */
+var SRC={
+  ctu_bulk:{t:"CTUIL — ISTS substations for bulk consumers (as on 31-08-2025)",u:"https://ctuil.in/substation-bulk-consumers"},
+  ctu_re:{t:"CTUIL — bay allocation & solar/non-solar margins",u:"https://ctuil.in/renewable-energy"},
+  tnd85:{t:"T&D India — MPPTCL transformation capacity crosses 85 GVA",u:"https://www.tndindia.com/mpptcls-transformation-capacity-crosses-85-gva-mark/"},
+  tndMand:{t:"T&D India — 500 MVA transformer at Mandsaur",u:"https://www.tndindia.com/mpptcl-energizes-500-mva-power-transformer-at-mandsaur-substation/amp/"},
+  indigrid:{t:"IndiGrid — Bhopal Dhule Transmission Co. (BDTCL)",u:"https://www.indigrid.co.in/portfolio-assets/bhopal-dhule-transmission-company-limited-bdtcl"},
+  rackbank:{t:"DCD — RackBank 80 MW AI data centre, Indore",u:"https://www.datacenterdynamics.com/en/news/rackbank-announces-80mw-madya-pradesh-data-center-in-india/"},
+  ceic:{t:"CEIC / CEA — MP peak demand series",u:"https://www.ceicdata.com/en/india/electricity-demand-and-supply/power-peak-demand-western-madhya-pradesh"},
+  sldc:{t:"MP SLDC, Jabalpur",u:"https://sldcmpindia.in/"},
+  mock:{t:"Headroom demo model — mock values, not from any source",u:"#"}
+};
+
+/* ---------- Substations (headroom = MOCK; capacity flagged per record) ---------- */
+var S=[
+ {id:"bdtcl",n:"Bhopal (BDTCL)",own:"IndiGrid",v:765,lat:23.40,lng:77.45,mva:3000,mvaV:true,day:180,night:90,c:"Inter-state corridor node; transit loading limits spare capacity.",plan:null,bess:false,src:["indigrid","ctu_re","mock"]},
+ {id:"suky",n:"Suky Sewaniya",own:"MPPTCL",v:400,lat:23.33,lng:77.56,mva:1630,mvaV:true,day:150,night:70,c:"Serves Bhopal urban load; 500 MVA transformer added 2024.",plan:null,bess:false,src:["tnd85","mock"]},
+ {id:"bina",n:"Bina",own:"MPPTCL",v:400,lat:24.18,lng:78.20,mva:1260,mvaV:true,day:140,night:110,c:"Next to PGCIL 765 kV hub. Proposed 250 MW / 500 MWh BESS node.",plan:"BESS 250 MW / 500 MWh (tender)",bess:true,src:["tnd85","mock"]},
+ {id:"manglia",n:"Manglia (Indore)",own:"MPPTCL",v:220,lat:22.79,lng:75.75,mva:null,mvaV:false,day:90,night:40,c:"+200 MVA added Apr 2026. Shares area load with RackBank's 80 MW campus.",plan:null,bess:false,src:["tnd85","rackbank","mock"]},
+ {id:"pgIndore",n:"Indore (PG)",own:"PGCIL",v:765,lat:22.62,lng:75.66,mva:null,mvaV:false,day:200,night:95,c:"ISTS node with pending RE connectivity (e.g., 300 MW Ujjain wind); bay availability constrained.",plan:null,bess:false,src:["ctu_re","mock"]},
+ {id:"pitham",n:"Pithampur",own:"MPPTCL",v:220,lat:22.61,lng:75.69,mva:null,mvaV:false,day:70,night:35,c:"Industrial cluster; high daytime and night industrial load.",plan:null,bess:false,src:["mock"]},
+ {id:"ujjain",n:"Ujjain",own:"MPPTCL",v:220,lat:23.18,lng:75.78,mva:null,mvaV:false,day:85,night:45,c:"Wind injection nearby; night margin depends on wind output.",plan:null,bess:false,src:["mock"]},
+ {id:"mandsaur",n:"Mandsaur",own:"MPPTCL",v:400,lat:24.07,lng:75.07,mva:1130,mvaV:true,day:300,night:60,c:"Solar-rich Malwa hub: large daytime margin, thin at night.",plan:"Kurawar scheme ~Jun 2027",bess:false,src:["tndMand","ctu_re","mock"]},
+ {id:"neemuch",n:"Neemuch",own:"MPPTCL",v:400,lat:24.47,lng:74.87,mva:null,mvaV:false,day:260,night:40,c:"1 GW solar park pooling; export-oriented, weak night supply.",plan:"2×500 MVA pooling (planned)",bess:false,src:["ctu_re","mock"]},
+ {id:"kurawar",n:"Kurawar",own:"PGCIL",v:765,lat:23.51,lng:77.00,mva:null,mvaV:false,day:0,night:0,c:"Under construction; expected around June 2027.",plan:"765/400/220 kV ISTS, ~Jun 2027",bess:false,src:["ctu_re","mock"],uc:true},
+ {id:"itarsi",n:"Itarsi",own:"PGCIL",v:400,lat:22.61,lng:77.76,mva:null,mvaV:false,day:120,night:85,c:"Central WR node; good thermal support from the south.",plan:null,bess:false,src:["mock"]},
+ {id:"seoni",n:"Seoni",own:"PGCIL",v:765,lat:22.09,lng:79.54,mva:null,mvaV:false,day:160,night:120,c:"Early 765 kV AIS node on the east–west corridor.",plan:null,bess:false,src:["mock"]},
+ {id:"jabalpur",n:"Jabalpur",own:"PGCIL",v:400,lat:23.17,lng:79.93,mva:null,mvaV:false,day:130,night:100,c:"Near SLDC and eastern discom HQ; thermal-backed.",plan:null,bess:false,src:["sldc","mock"]},
+ {id:"katni",n:"Katni",own:"MPPTCL",v:400,lat:23.83,lng:80.39,mva:null,mvaV:false,day:95,night:80,c:"Industrial belt; moderate spare capacity.",plan:null,bess:false,src:["mock"]},
+ {id:"satna",n:"Satna",own:"PGCIL",v:765,lat:24.58,lng:80.83,mva:null,mvaV:false,day:170,night:140,c:"Close to Singrauli-area thermal generation; strongest night profile.",plan:null,bess:false,src:["mock"]},
+ {id:"birsing",n:"Birsinghpur (Pali)",own:"MPPTCL",v:400,lat:23.36,lng:81.09,mva:null,mvaV:false,day:120,night:140,c:"Co-located with 1,340 MW Sanjay Gandhi TPS. Proposed 125 MW / 250 MWh BESS.",plan:"BESS 125 MW / 250 MWh (tender)",bess:true,src:["mock"]},
+ {id:"sendhwa",n:"Sendhwa",own:"MPPTCL",v:220,lat:21.68,lng:75.09,mva:null,mvaV:false,day:80,night:95,c:"Proposed 250 MW / 500 MWh BESS node improves night headroom.",plan:"BESS 250 MW / 500 MWh (tender)",bess:true,src:["mock"]},
+ {id:"gwalior",n:"Gwalior",own:"PGCIL",v:765,lat:26.20,lng:78.10,mva:null,mvaV:false,day:150,night:90,c:"Northern gateway node toward the Agra corridor.",plan:null,bess:false,src:["mock"]},
+ {id:"sagar",n:"Sagar",own:"MPPTCL",v:220,lat:23.84,lng:78.76,mva:null,mvaV:false,day:75,night:55,c:"Regional load centre.",plan:null,bess:false,src:["mock"]}
+];
+
+var CITIES=[["Bhopal",23.26,77.41],["Indore",22.72,75.86],["Jabalpur",23.18,79.95],["Gwalior",26.22,78.18],["Ujjain",23.18,75.78],["Sagar",23.84,78.74],["Rewa",24.53,81.30],["Satna",24.58,80.83]];
+
+/* ---------- State ---------- */
+var st={mode:"night",volts:new Set([765,400,220]),owners:new Set(["PGCIL","MPPTCL","IndiGrid"]),minH:0,mw:100,city:"Bhopal",rad:250,rtc:true,ranked:[],sel:null,plan:true,labels:true};
+var $=function(id){return document.getElementById(id)};
+var NS="http://www.w3.org/2000/svg";
+function el(t,a,p){var e=document.createElementNS(NS,t);for(var k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+
+function hv(s){return st.mode==="day"?s.day:s.night;}
+function colorFor(h){var m=st.mw;if(h>=m)return"var(--good)";if(h>=m/2)return"var(--mid)";return"var(--bad)";}
+function dist(a,b,c,d){var R=6371,r=Math.PI/180,x=(c-a)*r,y=(d-b)*r;var h=Math.sin(x/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+function visible(s){return st.volts.has(s.v)&&st.owners.has(s.own)&&hv(s)>=st.minH;}
+
+/* ---------- Static layers ---------- */
+(function(){
+  var g=$("grid");
+  for(var lng=74;lng<=83;lng++){var a=xy(27.2,lng),b=xy(20.9,lng);el("line",{x1:a[0],y1:a[1],x2:b[0],y2:b[1]},g);}
+  for(var lat=21;lat<=27;lat++){var a=xy(lat,73.8),b=xy(lat,83);el("line",{x1:a[0],y1:a[1],x2:b[0],y2:b[1]},g);}
+  var sel=$("city");
+  CITIES.forEach(function(c){var o=document.createElement("option");o.textContent=c[0];sel.appendChild(o);});
+  var v=$("fVolt");[765,400,220].forEach(function(x){var b=document.createElement("button");b.className="chip on";b.textContent=x+" kV";b.onclick=function(){toggle(st.volts,x,b)};v.appendChild(b);});
+  var o=$("fOwn");["PGCIL","MPPTCL","IndiGrid"].forEach(function(x){var b=document.createElement("button");b.className="chip on";b.textContent=x;b.onclick=function(){toggle(st.owners,x,b)};o.appendChild(b);});
+  var sl=$("srclist");Object.keys(SRC).forEach(function(k){if(k==="mock")return;var li=document.createElement("li");li.innerHTML='<a target="_blank" rel="noopener" href="'+SRC[k].u+'">'+SRC[k].t+'</a>';sl.appendChild(li);});
+  var d=$("dbars"),data=[["Jan '26",19902,"var(--sun)"],["Jun '26",13441,"var(--line2)"],["Jul '26",13818,"var(--night)"]];
+  data.forEach(function(r){var w=document.createElement("div");w.className="bar";w.innerHTML='<span>'+r[1].toLocaleString("en-IN")+'</span><div style="height:'+(r[1]/19902*70)+'px;background:'+r[2]+'"></div><span style="color:var(--ink3)">'+r[0]+'</span>';d.appendChild(w);});
+})();
+function toggle(set,x,b){if(set.has(x)){if(set.size===1)return;set.delete(x);b.classList.remove("on");}else{set.add(x);b.classList.add("on");}draw();}
+
+/* ---------- Draw ---------- */
+function draw(){
+  var cg=$("cities");cg.innerHTML="";
+  if(st.labels)CITIES.forEach(function(c){var p=xy(c[1],c[2]);el("circle",{cx:p[0],cy:p[1],r:2},cg);var t=el("text",{x:p[0]+6,y:p[1]-6},cg);t.textContent=c[0];});
+  var rg=$("ring");rg.innerHTML="";
+  if(st.ranked.length){var c=CITIES.find(function(c){return c[0]===st.city});var p=xy(c[1],c[2]);el("circle",{class:"searchring",cx:p[0],cy:p[1],r:st.rad*P.sx/111},rg);}
+  var ng=$("nodes");ng.innerHTML="";
+  S.slice().sort(function(a,b){return a.v-b.v}).forEach(function(s){
+    var p=xy(s.lat,s.lng),h=hv(s),r=s.v===765?9:s.v===400?7:5.5,col=s.uc?"var(--ink3)":colorFor(h);
+    var g=el("g",{class:"node"+(visible(s)?"":" dim")+(st.sel===s.id?" sel":""),transform:"translate("+p[0]+","+p[1]+")"},ng);
+    el("circle",{class:"halo",r:r*2.4,fill:col},g);
+    if(st.plan&&s.plan)el("circle",{class:"planned",r:r+6,stroke:"var(--ink2)"},g);
+    el("circle",{class:"core",r:r,fill:col,stroke:"var(--bg)","stroke-width":1.5},g);
+    var rk=st.ranked.indexOf(s.id);
+    if(rk>-1&&rk<3){var t=el("text",{class:"rank","text-anchor":"middle",y:4},g);t.textContent=rk+1;}
+    if(st.plan&&s.bess){var b=el("text",{class:"bess",x:r+5,y:-r-2,fill:"var(--night)"},g);b.textContent="B";}
+    g.addEventListener("mouseenter",function(e){showTip(s,e)});
+    g.addEventListener("mousemove",function(e){showTip(s,e)});
+    g.addEventListener("mouseleave",function(){$("tip").style.opacity=0});
+    g.addEventListener("click",function(){select(s.id)});
+  });
+}
+function showTip(s,e){var t=$("tip"),b=$("map").getBoundingClientRect();
+  t.innerHTML='<div>'+s.n+' · '+s.v+' kV</div><div class="mono">'+(s.uc?'under construction':(st.mode==="day"?"solar ":"night ")+hv(s)+' MW headroom (mock)')+'</div>';
+  t.style.left=Math.min(e.clientX-b.left+14,b.width-200)+"px";t.style.top=(e.clientY-b.top+14)+"px";t.style.opacity=1;}
+
+/* ---------- Detail drawer ---------- */
+function select(id){st.sel=id;draw();renderDetail();document.querySelectorAll(".res").forEach(function(r){r.classList.toggle("sel",r.dataset.id===id)});}
+function bar(label,val,color){var max=320,req=st.mw;
+  return '<div class="hbar"><div class="t"><span>'+label+'</span><b>'+val+' MW <span class="flag est">mock</span></b></div><div class="track"><div class="fill" style="width:'+Math.min(val/max*100,100)+'%;background:'+color+'"></div><div class="req" style="left:'+Math.min(req/max*100,100)+'%" title="Requested load"></div></div></div>';}
+function renderDetail(){
+  var d=$("detail"),s=S.find(function(x){return x.id===st.sel});
+  if(!s){d.innerHTML='<div class="empty"><div class="big">Pick a substation, or ask a scenario.</div>Every number in this panel links back to the document it came from. Values flagged <span class="flag est">mock</span> are placeholders until MPPTCL and SLDC data is ingested.</div>';return;}
+  var ok=s.uc?"Not yet available":(Math.min(s.day,s.night)>=st.mw?"Fits "+st.mw+" MW round the clock":s.day>=st.mw?"Fits "+st.mw+" MW in solar hours only":"Below "+st.mw+" MW");
+  var src=s.src.map(function(k,i){return '<a class="src" target="_blank" rel="noopener" href="'+SRC[k].u+'"><span class="i">['+(i+1)+']</span><span>'+SRC[k].t+'</span></a>';}).join("");
+  d.innerHTML='<div class="dh"><div class="own">'+s.own+' · '+s.v+' kV'+(s.uc?' · under construction':'')+'</div><h2>'+s.n+'</h2><div style="font-size:13px;color:'+(s.uc?'var(--ink3)':Math.min(s.day,s.night)>=st.mw?'var(--good)':s.day>=st.mw?'var(--mid)':'var(--bad)')+'">'+ok+'</div></div>'+
+   '<div class="kv"><div><div class="k">Transformation</div><div class="v">'+(s.mva?s.mva.toLocaleString("en-IN")+' MVA<span class="flag ver">verified</span>':'—<span class="flag est">not published</span>')+'</div></div><div><div class="k">Location</div><div class="v">'+s.lat.toFixed(2)+', '+s.lng.toFixed(2)+'<span class="flag est">approx</span></div></div></div>'+
+   '<div class="pad">'+(s.uc?'':bar("Solar-hour headroom",s.day,"var(--sun)")+bar("Non-solar headroom",s.night,"var(--night)"))+
+   '<p class="lbl" style="margin-top:4px">Constraints</p><p class="note">'+s.c+'</p>'+
+   (s.plan?'<p class="lbl">Planned</p><p class="note">'+s.plan+'</p>':'')+
+   '<p class="lbl">Sources</p><div class="srcs">'+src+'</div>'+
+   '<div class="claude"><div class="who">Claude · extraction note</div>'+(s.mvaV?'Capacity extracted from the cited report and cross-checked against MPPTCL network totals. Headroom is modelled.':'No per-substation capacity found in public documents. Queued for MPPTCL data request.')+'</div></div>';
+}
+
+/* ---------- Scenario ---------- */
+function run(){
+  st.mw=+$("mw").value||100;st.city=$("city").value;st.rad=+$("rad").value;st.rtc=$("rtc").checked;
+  $("qMw").textContent=st.mw+" MW";$("qCity").textContent=st.city;$("qRtc").textContent=st.rtc?", 24×7":", daytime";
+  if(st.rtc&&st.mode!=="night")setMode("night");
+  var c=CITIES.find(function(x){return x[0]===st.city});
+  var cand=S.filter(function(s){return !s.uc&&dist(c[1],c[2],s.lat,s.lng)<=st.rad}).map(function(s){
+    var cap=st.rtc?Math.min(s.day,s.night):s.day,dk=dist(c[1],c[2],s.lat,s.lng);
+    return {s:s,cap:cap,dk:dk,score:(cap>=st.mw?1000:0)+cap-dk*0.1};
+  }).sort(function(a,b){return b.score-a.score});
+  st.ranked=cand.map(function(x){return x.s.id});
+  var fit=cand.filter(function(x){return x.cap>=st.mw});
+  var res=$("results");res.innerHTML="";
+  cand.slice(0,5).forEach(function(x,i){var r=document.createElement("div");r.className="res";r.dataset.id=x.s.id;
+    r.innerHTML='<span class="n">'+(i+1)+'</span><div><div class="nm">'+x.s.n+'</div><div class="sub">'+x.s.v+' kV · '+Math.round(x.dk)+' km</div></div><div class="hm" style="color:'+(x.cap>=st.mw?'var(--good)':x.cap>=st.mw/2?'var(--mid)':'var(--bad)')+'">'+x.cap+' MW</div>';
+    r.onclick=function(){select(x.s.id)};res.appendChild(r);});
+  var top=cand[0],uc=S.find(function(s){return s.uc});
+  var txt;
+  if(!cand.length){txt="No substations in range. Try a larger radius.";}
+  else if(fit.length){txt="<b>"+fit.length+" substation"+(fit.length>1?"s":"")+"</b> within "+st.rad+" km can take "+st.mw+" MW"+(st.rtc?" round the clock":" in solar hours")+". Best fit is <b>"+top.s.n+"</b> ("+top.s.v+" kV, "+Math.round(top.dk)+" km) with "+top.cap+" MW modelled headroom"+(st.rtc?" at night":"")+".<span class=cite data-s='"+top.s.id+"'>"+(top.s.src.length)+" src</span> ";}
+  else{txt="No substation within "+st.rad+" km has "+st.mw+" MW "+(st.rtc?"of night":"of")+" headroom. Closest is <b>"+top.s.n+"</b> at "+top.cap+" MW.<span class=cite data-s='"+top.s.id+"'>src</span> ";}
+  if(cand.length&&st.rtc)txt+=" Night supply here is thermal-backed; MP's first BESS units (Bina, Sendhwa, Birsinghpur) are still at tender stage.";
+  if(uc&&dist(c[1],c[2],uc.lat,uc.lng)<=st.rad)txt+=" <b>Kurawar 765 kV</b> (~Jun 2027) would add capacity in this radius.";
+  txt+=" <span style='color:var(--ink3)'>Headroom values are mock in this demo.</span>";
+  typeOut(txt);
+  st.sel=top?top.s.id:null;draw();renderDetail();
+  var first=res.querySelector(".res");if(first)first.classList.add("sel");
+}
+var typer;
+function typeOut(html){
+  clearInterval(typer);var a=$("answer");var plain=html,i=0;
+  a.innerHTML='<span class="caret"></span>';
+  typer=setInterval(function(){
+    i+=4;
+    if(i>=plain.length){clearInterval(typer);a.innerHTML=plain;bindCites();return;}
+    var cut=plain.slice(0,i);if(cut.lastIndexOf("<")>cut.lastIndexOf(">"))return;
+    a.innerHTML=cut+'<span class="caret"></span>';
+  },12);
+}
+function bindCites(){document.querySelectorAll(".cite").forEach(function(c){c.onclick=function(){select(c.dataset.s)}});}
+
+/* ---------- Mode, filters, tabs ---------- */
+function setMode(m){st.mode=m;document.body.className=m;$("bDay").classList.toggle("on",m==="day");$("bNight").classList.toggle("on",m==="night");draw();}
+$("bDay").onclick=function(){setMode("day")};$("bNight").onclick=function(){setMode("night")};
+$("minH").oninput=function(){st.minH=+this.value;$("minHv").textContent=st.minH?"≥ "+st.minH+" MW":"show all";draw();};
+$("lPlan").onchange=function(){st.plan=this.checked;draw()};
+$("lCity").onchange=function(){st.labels=this.checked;draw()};
+$("run").onclick=run;
+$("mw").onkeydown=function(e){if(e.key==="Enter")run()};
+$("mw").oninput=function(){st.mw=+this.value||100;$("qMw").textContent=st.mw+" MW";draw();if(st.sel)renderDetail();};
+document.querySelectorAll(".tab").forEach(function(t){t.onclick=function(){document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("on")});document.querySelectorAll(".pane").forEach(function(x){x.classList.remove("on")});t.classList.add("on");$(t.dataset.p).classList.add("on");}});
+
+draw();renderDetail();
+setTimeout(run,400);
+</script>
+</body>
+</html>

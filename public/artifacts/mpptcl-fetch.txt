@@ -1,0 +1,10 @@
+# Captured 2026-09-20T09:45:14Z
+# Target: MPPTCL 'LIST OF EHV SUBSTATION WITH AVAILABILITY OF MARGIN (MVA)'
+# This is the single most useful dataset for the question this tool asks.
+# Recorded evidence. Not fetched at demo time.
+---
+http_code=404
+content_type=text/html
+size=1245
+redirects=0
+final_url=https://www.mptransco.in/STU_Cell/MPSTU-Availability%20of%20Margin(MVA).pdf

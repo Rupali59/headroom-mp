@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnp.*
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# Environment — never commit a key
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel
+
+# Ingested data. MongoDB is the source of truth (see DATA.md); this is a local
+# working artifact, 12 MB of MPPTCL operational rows. It stays out of git so the
+# public repo carries code only and history stays clean by construction.
+data-local/
+
+# Source documents are NOT redistributed from this repo.
+# They carry a RESTRICTED data-classification marking, they are published
+# monthly (so a pinned copy is stale by design), and they belong to CTUIL.
+# Fetch them locally with: bash scripts/fetch-sources.sh
+extraction-test/fixtures/*.pdf
+*.pdf
+
+# Scratch
+files.zip
+.DS_Store
+*.log
+.env*
+# `vercel link` appends the line above, AFTER the negation near the top of this
+# file. Later patterns win, so it silently re-ignores .env.example and the public
+# repo loses the env template its README tells people to copy. Re-assert it here;
+# if vercel appends again, this negation must stay last.
+!.env.example

@@ -1,0 +1,196 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Headroom MP palette — design-system/MASTER.md §2.
+ * Dark is the primary scene (control room, dimmed hall); light is the
+ * @media-derived fallback. Trap #1 from MASTER.md §4 "Two traps in this
+ * exact stack": shadcn's own `init` emitted `--font-sans: var(--font-sans)`
+ * here, a circular self-reference. Tailwind v4's `@theme inline` resolves
+ * custom properties at PARSE time, so even a next/font CSS variable would
+ * resolve to nothing through this block — hence literal family names below,
+ * never `var(--font-instrument-serif)`.
+ */
+@theme inline {
+  /* Product palette, mapped straight through to Tailwind utilities:
+     bg-bg, text-ink, border-line, text-good, fill-map-fill, etc. */
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg2);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel2);
+  --color-line: var(--line);
+  --color-line-2: var(--line2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink2);
+  --color-ink-3: var(--ink3);
+  --color-good: var(--good);
+  --color-mid: var(--mid);
+  --color-bad: var(--bad);
+  --color-sun: var(--sun);
+  --color-night: var(--night);
+  --color-map-fill: var(--map-fill);
+  --color-map-stroke: var(--map-stroke);
+
+  /* Type — MASTER.md §3. Literal names: see the trap note above. */
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* Display face for headings — dialog.tsx / alert-dialog.tsx apply
+     `font-heading` to their titles. MASTER.md §3: Instrument Serif is the
+     display voice, never below 20px. */
+  --font-heading: var(--font-serif);
+
+  /* shadcn semantic roles, restyled onto the product palette rather than
+     shadcn's own zinc/neutral base — MASTER.md §4 "Deliberate deviations". */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Dark is the primary scene — the bare :root is the dark palette, and the
+   light theme is the derived/overridden case. Mirrors the frozen reference
+   copy in mp-headroom-app.html §:root, which this file supersedes. */
+:root {
+  --bg: #0a0b0d;
+  --bg2: #0f1115;
+  --panel: #13161b;
+  --panel2: #181b21;
+  --line: #23272f;
+  --line2: #2f343e;
+  --ink: #eceae4;
+  --ink2: #a6a5a0;
+  --ink3: #6b6b68;
+  --good: #5fd4a0;
+  --mid: #f2c14e;
+  --bad: #ff7a6b;
+  --sun: #f2a541;
+  --night: #8b9cff;
+  --map-fill: #12151a;
+  --map-stroke: #3a404b;
+
+  --radius: 0.625rem;
+
+  /* shadcn semantic roles derived from the palette above. --primary /
+     --primary-foreground and --background / --foreground are deliberately
+     opposite-polarity pairs (ink vs bg) so contrast holds across both
+     themes without a second set of literals. */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--panel);
+  --card-foreground: var(--ink);
+  --popover: var(--panel2);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--bg);
+  --secondary: var(--panel2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--panel2);
+  --muted-foreground: var(--ink2);
+  --accent: var(--line2);
+  --accent-foreground: var(--ink);
+  --destructive: var(--bad);
+  --border: var(--line);
+  --input: var(--line2);
+  --ring: var(--night);
+}
+
+/* Light theme — design-system/MASTER.md §2 "Light theme — corrected, three
+   tokens were failing". --good/--mid/--bad/--sun/--ink3 are the corrected
+   values (all >=4.5:1 on this --bg); the rest carry over unchanged from the
+   frozen reference copy. Applies when the OS prefers light AND no explicit
+   [data-theme="dark"] override is set. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f3f1ec;
+    --bg2: #ebe8e1;
+    --panel: #ffffff;
+    --panel2: #f7f5f0;
+    --line: #dedad1;
+    --line2: #cdc8bd;
+    --ink: #16171a;
+    --ink2: #55565a;
+    --ink3: #6f6e6a;
+    --good: #0f6b42;
+    --mid: #7a5600;
+    --bad: #b3261e;
+    --sun: #8a5200;
+    --night: #4b5bd6;
+    --map-fill: #ffffff;
+    --map-stroke: #b9b3a6;
+  }
+}
+
+/* Explicit override hooks, for a future manual theme toggle — matches the
+   [data-theme] contract already used by the frozen mp-headroom-app.html. */
+:root[data-theme="light"] {
+  --bg: #f3f1ec;
+  --bg2: #ebe8e1;
+  --panel: #ffffff;
+  --panel2: #f7f5f0;
+  --line: #dedad1;
+  --line2: #cdc8bd;
+  --ink: #16171a;
+  --ink2: #55565a;
+  --ink3: #6f6e6a;
+  --good: #0f6b42;
+  --mid: #7a5600;
+  --bad: #b3261e;
+  --sun: #8a5200;
+  --night: #4b5bd6;
+  --map-fill: #ffffff;
+  --map-stroke: #b9b3a6;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0a0b0d;
+  --bg2: #0f1115;
+  --panel: #13161b;
+  --panel2: #181b21;
+  --line: #23272f;
+  --line2: #2f343e;
+  --ink: #eceae4;
+  --ink2: #a6a5a0;
+  --ink3: #6b6b68;
+  --good: #5fd4a0;
+  --mid: #f2c14e;
+  --bad: #ff7a6b;
+  --sun: #f2a541;
+  --night: #8b9cff;
+  --map-fill: #12151a;
+  --map-stroke: #3a404b;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}

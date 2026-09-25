@@ -25,11 +25,24 @@
 
 workspace: true
 
+# `concepts:` IS COMMENTED OUT, DELIBERATELY — 2026-09-25.
+# The schema types it as an OBJECT keyed by section anchor (anchor -> list of tags);
+# this file wrote a bare list. That is a source-level violation, which is fatal rather
+# than prunable, so ALL 19 edges below were inert — silently, for as long as it stood.
+# Found via `doctor`'s `sidecars.rejected: 1`.
+#
+# The tags are kept verbatim rather than reshaped, because the anchor form does not fit:
+# three of the seven sources here are not markdown (ingest/mpptcl-loading.py,
+# extraction-test/extract.ts, src/app/dev/gallery/page.tsx) and have no sections to key
+# by. These were always document-level tags, and the schema has no slot for those.
+# `concepts` is forward-compat for graph-augment V2 and is read by nothing today, so the
+# edges are worth more than the tags. Reinstate them if V2 gains a document-level form.
+
 sources:
   DATA.md:
-    concepts:
-      - measured-not-modelled
-      - confidence-ladder
+#   concepts:
+#     - measured-not-modelled
+#     - confidence-ladder
     propagates_to:
       - path: DESIGN.md
         why: "DATA.md supersedes DESIGN.md's confidence ladder, coincidence model, hatching set and Blocked sources content. This exact edge drifted twice in one day: the obsolete voltage-class `derived` tier, and the disproven citations claim."
@@ -45,8 +58,8 @@ sources:
         kind: prose
 
   ingest/mpptcl-loading.py:
-    concepts:
-      - mpptcl-ingest
+#   concepts:
+#     - mpptcl-ingest
     propagates_to:
       - path: DATA.md
         why: "every figure in DATA.md's 'What we now hold' block (27,680 rows / 55 months / 432 substations / 100% capacity / peak dates) is output of this script. Change the parser and those numbers are stale, silently."
@@ -59,9 +72,9 @@ sources:
         kind: code
 
   design-system/MASTER.md:
-    concepts:
-      - design-tokens
-      - wcag-aa
+#   concepts:
+#     - design-tokens
+#     - wcag-aa
     propagates_to:
       - path: src/app/globals.css
         why: "MASTER.md §2 is the single source for colour tokens; globals.css is where they are emitted once into Tailwind v4 @theme. 13 tokens had already diverged across two files before this was written, two of them by NAME (--ok/--good), which is the silent kind."
@@ -74,8 +87,8 @@ sources:
         kind: prose
 
   BUILD.md:
-    concepts:
-      - lane-ownership
+#   concepts:
+#     - lane-ownership
     propagates_to:
       - path: DESIGN.md
         why: "BUILD.md supersedes DESIGN.md's Stack, Next Steps and Distribution sections. DESIGN.md's header says so; if BUILD.md's architecture changes again, that header is the thing that goes stale first."
@@ -85,8 +98,8 @@ sources:
         kind: code
 
   extraction-test/extract.ts:
-    concepts:
-      - api-claims
+#   concepts:
+#     - api-claims
     propagates_to:
       - path: DESIGN.md
         why: "this probe exists to test three API claims DESIGN.md makes. It has already disproven one (citations return nothing through a strict tool, because citations attach to text blocks and a tool_use response has none). If the probe's result changes, the doc must."
@@ -94,3 +107,28 @@ sources:
       - path: extraction-test/README.md
         why: "the README states what C1, C2 and C3 assert. C1's status is now NOT CONFIRMED and the README must not outlive that."
         kind: prose
+
+  design-system/RULES.md:
+#   concepts:
+#     - design-rules
+    propagates_to:
+      - path: scripts/check-design-rules.mjs
+        why: "RULES.md Tier A states each rule and this script is the only thing that enforces it. A rule written in RULES.md that the script does not check is a rule that is not enforced, and reads as enforced — which is the failure this whole loop exists to catch. A7 was added to both on 2026-09-21 after the gallery found the defect; nothing but this edge keeps the pair together."
+        kind: code
+      - path: .claude/commands/design-review.md
+        why: "the review command is the PROCEDURE for RULES.md's three tiers and names them by number. It already cites A4, B1-B6 and C1-C9; renumbering or dropping a rule in RULES.md leaves the command sending a reviewer to a rule that no longer exists."
+        kind: prose
+      - path: design-system/MASTER.md
+        why: "RULES.md quotes MASTER.md §2, §4, §5, §6 and §7 verbatim as the source of each checkable rule. MASTER.md is canonical for what the design system IS; if a quoted passage changes there, the derived rule here is wrong while still looking measured."
+        kind: prose
+
+  src/app/dev/gallery/page.tsx:
+#   concepts:
+#     - gallery-coverage
+    propagates_to:
+      - path: src/components
+        why: "the gallery is the only surface that renders every component in every state, so a component added WITHOUT a gallery entry is invisible to the screenshot review and to the regression net at once — and both keep reporting green, because neither can miss what it was never shown. Coverage that silently shrinks is the exact shape of a check that cannot fail."
+        kind: code
+      - path: tests/vrt/gallery.test.tsx
+        why: "the VRT suite addresses sections by their data-gallery ids and keeps a committed baseline per id. Renaming or removing a section id orphans a baseline and silently drops that section from the net; RULES.md A6 checks the ids exist and are unique, but only this edge ties the two files together."
+        kind: code

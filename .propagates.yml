@@ -79,8 +79,8 @@ sources:
       - path: src/app/globals.css
         why: "MASTER.md §2 is the single source for colour tokens; globals.css is where they are emitted once into Tailwind v4 @theme. 13 tokens had already diverged across two files before this was written, two of them by NAME (--ok/--good), which is the silent kind."
         kind: code
-      - path: src/components/ui
-        why: "MASTER.md §6 commits to WCAG 2.2 AA and the 44px target-size sweep. shadcn regenerates these components with its own defaults (button 36px, slider thumb 12px), so any `shadcn add` re-run silently reverts the sweep."
+      - path: src/components/ui/*.tsx
+        why: "MASTER.md §6 commits to WCAG 2.2 AA and the 44px target-size sweep. shadcn regenerates these components with its own defaults (button 36px, slider thumb 12px), so any `shadcn add` re-run silently reverts the sweep. A GLOB, not the bare directory: `propagate doctor` refuses a directory downstream (it reads as EISDIR) because a directory cannot be diffed, and the thing that must not drift is each component file. Matches 15 files as written."
         kind: code
       - path: DESIGN.md
         why: "DESIGN.md's Stack section restates MASTER.md's shadcn install commands and flags. It has already carried two wrong ones (--base radix as default, the npmrc fix)."
@@ -126,8 +126,8 @@ sources:
 #   concepts:
 #     - gallery-coverage
     propagates_to:
-      - path: src/components
-        why: "the gallery is the only surface that renders every component in every state, so a component added WITHOUT a gallery entry is invisible to the screenshot review and to the regression net at once — and both keep reporting green, because neither can miss what it was never shown. Coverage that silently shrinks is the exact shape of a check that cannot fail."
+      - path: src/components/**/*.tsx
+        why: "the gallery is the only surface that renders every component in every state, so a component added WITHOUT a gallery entry is invisible to the screenshot review and to the regression net at once — and both keep reporting green, because neither can miss what it was never shown. Coverage that silently shrinks is the exact shape of a check that cannot fail. A GLOB rather than the bare directory, which doctor refuses as EISDIR — and `**` deliberately, because a component added in a NEW subdirectory is precisely the one a shallow pattern would miss, which would reproduce the shrinking coverage this edge exists to catch. Matches 38 files as written."
         kind: code
       - path: tests/vrt/gallery.test.tsx
         why: "the VRT suite addresses sections by their data-gallery ids and keeps a committed baseline per id. Renaming or removing a section id orphans a baseline and silently drops that section from the net; RULES.md A6 checks the ids exist and are unique, but only this edge ties the two files together."

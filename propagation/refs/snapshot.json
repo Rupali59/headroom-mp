@@ -1,0 +1,80 @@
+{
+  "schema_version": 2,
+  "captured_at": "2026-09-29T03:32:26.602Z",
+  "captured_by": "propagate/refs",
+  "blind_spot": "a ref created and deleted inside one window is invisible to this instrument",
+  "workspace_root": "/Users/rupali.b/Documents/GitHub/Rupali/Experiments/ClaudeBuild/Grid",
+  "projects": {
+    "workspace": {
+      "repo_root": "/Users/rupali.b/Documents/GitHub/Rupali/Experiments/ClaudeBuild/Grid",
+      "base_ref": null,
+      "error": null,
+      "merge_state_error": null,
+      "refs": {
+        "main": {
+          "head": "3a95cc8eb08527a8fbff4f8c68703cc47680d3e1",
+          "merge_state": null,
+          "upstream": "origin/main",
+          "upstream_track": "",
+          "last_commit_iso": "2026-09-28T15:25:43+05:30",
+          "is_active_line": null,
+          "worktrees": [
+            "/Users/rupali.b/Documents/GitHub/Rupali/Experiments/ClaudeBuild/Grid"
+          ]
+        }
+      },
+      "detached_worktrees": []
+    }
+  },
+  "skipped": [
+    {
+      "name": "data-local",
+      "reason": "inside the workspace repo — shares its refs"
+    },
+    {
+      "name": "design-system",
+      "reason": "inside the workspace repo — shares its refs"
+    },
+    {
+      "name": "docs",
+      "reason": "inside the workspace repo — shares its refs"
+    },
+    {
+      "name": "extraction-test",
+      "reason": "inside the workspace repo — shares its refs"
+    },
+    {
+      "name": "ingest",
+      "reason": "inside the workspace repo — shares its refs"
+    },
+    {
+      "name": "node_modules",
+      "reason": "inside the workspace repo — shares its refs"
+    },
+    {
+      "name": "out",
+      "reason": "inside the workspace repo — shares its refs"
+    },
+    {
+      "name": "propagation",
+      "reason": "inside the workspace repo — shares its refs"
+    },
+    {
+      "name": "public",
+      "reason": "inside the workspace repo — shares its refs"
+    },
+    {
+      "name": "scripts",
+      "reason": "inside the workspace repo — shares its refs"
+    },
+    {
+      "name": "src",
+      "reason": "inside the workspace repo — shares its refs"
+    },
+    {
+      "name": "tests",
+      "reason": "inside the workspace repo — shares its refs"
+    }
+  ],
+  "active_lines_reason": "no CONTEXT-BUDGET.md at docs/conventions/CONTEXT-BUDGET.md — no active line is declared for this workspace"
+}
